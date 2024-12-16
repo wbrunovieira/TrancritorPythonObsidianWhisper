@@ -3,23 +3,19 @@ import whisper
 import datetime
 import soundfile as sf
 
-# Directory paths
 AUDIO_DIRECTORY = './audio_files'
 TRANSCRIPT_DIRECTORY = './transcripts'
 
-# Function to convert video files to audio
-
-def convert_video_to_audio(file_path, format='wav'):
-    """Converts video files to audio in the desired format (wav, mp3, etc.)"""
-    filename, extension = os.path.splitext(file_path)
-    output_file = f"{filename}.{format}"
-    
-    command = f"ffmpeg -i \"{file_path}\" -vn -acodec pcm_s16le -ar 44100 -ac 2 \"{output_file}\""
-    os.system(command)
-    
-    return output_file
-
-# Function to transcribe the audio
+def display_menu():
+    """Displays the menu options for the user."""
+    print("\033[1;34m\n📢 Audio Transcriber Menu\033[0m\n")  
+    print("\033[1;34m\n=========================\033[0m\n")  
+    print("\033[1;32m1️⃣  🎙️ - Transcribe from audio file\033[0m\n")  
+    print("\033[1;32m2️⃣  🎥 - Transcribe from video file\033[0m\n")  
+    print("\033[1;32m3️⃣  🔊 - Transcribe from computer audio output\033[0m\n")  
+    print("\033[1;32m4️⃣  🌐 - Transcribe from local environment audio\033[0m\n")  
+    print("\033[1;31m5️⃣ 🚪 - Exit\033[0m\n")  
+    print("\033[1;34m\n=========================\033[0m\n") 
 
 def transcribe_audio(audio_path, model='base'):
     """Transcribes an audio file using Whisper."""
@@ -29,7 +25,6 @@ def transcribe_audio(audio_path, model='base'):
     print(f"✅ Transcription completed for: {audio_path}")
     return result['text']
 
-# Function to save the transcription in Markdown
 
 def save_transcription(file_name, transcription):
     """Saves the transcription in Markdown (.md) format."""
@@ -44,7 +39,6 @@ def save_transcription(file_name, transcription):
     
     print(f"💾 Transcription saved in: {transcription_path}")
 
-# Main function to process audio files
 
 def process_audio_files():
     """Scans the audio directory and processes the audio files."""
@@ -53,19 +47,28 @@ def process_audio_files():
         if file_name.endswith(('.mp3', '.wav', '.mp4', '.m4a')):
             file_path = os.path.join(AUDIO_DIRECTORY, file_name)
             
-            # Convert video to audio if necessary
-            if file_name.endswith(('.mp4', '.m4a')):
-                file_path = convert_video_to_audio(file_path)
             
-            # Transcribe the audio
             transcription = transcribe_audio(file_path)
             
-            # Save the transcription in Markdown format
             save_transcription(file_name, transcription)
         else:
             print(f"❌ Unsupported file format: {file_name}")
 
 if __name__ == "__main__":
-    print("📢 Starting course audio transcriber")
-    process_audio_files()
-    print("🏁 Transcription process completed!")
+    while True:
+        display_menu()
+        choice = input("👉 Please select an option (1-5): ")
+        
+        if choice == '1':
+            print("🟢 Option 1: Transcribe from audio file selected.")
+        elif choice == '2':
+            print("🟢 Option 2: Transcribe from video file selected.")
+        elif choice == '3':
+            print("🟢 Option 3: Transcribe from computer audio output selected.")
+        elif choice == '4':
+            print("🟢 Option 4: Transcribe from local environment audio selected.")
+        elif choice == '5':
+            print("🏁 Exiting the transcriber. Goodbye!")
+            break
+        else:
+            print("❌ Invalid option. Please select a valid option (1-5).")
