@@ -1,6 +1,6 @@
 import os
 import datetime
-from transcription import transcribe_audio
+from transcription import transcribe_audio, extract_audio_from_video
 from config import AUDIO_DIRECTORY, TRANSCRIPT_DIRECTORY
 
 def get_audio_files():
@@ -35,3 +35,10 @@ def process_multiple_files():
         transcription = transcribe_audio(file_path)
         save_transcription(file_name, transcription)
     print("✅ All files have been transcribed successfully.")
+
+
+def process_video_file(video_path):
+    """Processes a single video file by extracting audio and transcribing it."""
+    audio_path = extract_audio_from_video(video_path, AUDIO_DIRECTORY)
+    transcription = transcribe_audio(audio_path)
+    save_transcription(os.path.basename(video_path), transcription)
