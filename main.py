@@ -63,8 +63,24 @@ if __name__ == "__main__":
                 print(f"🎥 Selected video: {video_path}")
                 process_video_file(video_path)
         
-        elif choice == '4':
-            print("🟢 Option 4: Transcribe from computer audio output selected.")
+        if choice == '4':
+            print("🟢 Option 4: Extract audio from video selected.")
+            files = [f for f in os.listdir(VIDEO_DIRECTORY) if f.lower().endswith(('.mp4', '.mkv', '.avi', '.mov'))]
+            
+            if not files:
+                print("❌ No video files found in the directory.")
+            else:
+                print("\n📂 Available video files:\n")
+                for idx, file_name in enumerate(files, start=1):
+                    print(f"  {idx}. {file_name}")
+                
+                file_choice = get_user_choice("\n👉 Select the file number to extract audio: ", [str(i) for i in range(1, len(files) + 1)])
+                selected_file = files[int(file_choice) - 1]
+                video_path = os.path.join(VIDEO_DIRECTORY, selected_file)
+                print(f"🎥 Selected video: {video_path}")
+                
+                from transcription import extract_audio_from_video
+                extract_audio_from_video(video_path, AUDIO_DIRECTORY)
         
         elif choice == '5':
             print("🟢 Option 5: Transcribe from local environment audio selected.")
