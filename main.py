@@ -85,6 +85,23 @@ if __name__ == "__main__":
         elif choice == '5':
             print("🟢 Option 5: Transcribe from local environment audio selected.")
         
-        elif choice == '6':
+        
+        elif choice == '7':
+            print("🟢 Option 7: Analyze voice from audio selected.")
+            files = get_audio_files()
+            if not files:
+                print("❌ No audio files found in the directory.")
+            else:
+                print("\n📂 Available audio files:\n")
+                for idx, file_name in enumerate(files, start=1):
+                    print(f"  {idx}. {file_name}")
+                
+                file_choice = get_user_choice("\n👉 Select the file number to analyze voice: ", [str(i) for i in range(1, len(files) + 1)])
+                selected_file = files[int(file_choice) - 1]
+                audio_path = f"{AUDIO_DIRECTORY}/{selected_file}"
+                print(f"📁 Selected file: {audio_path}")
+                from voice_analysis import analyze_voice
+                analyze_voice(audio_path)
+        elif choice == '8':
             print("🏁 Exiting the transcriber. Goodbye!")
             break
