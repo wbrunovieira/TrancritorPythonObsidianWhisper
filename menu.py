@@ -9,5 +9,6 @@ def display_menu():
     print("\033[1;32m5️⃣  🔊   - Transcribe from computer audio output\033[0m\n")  
     print("\033[1;32m6️⃣  🌐   - Transcribe from local environment audio\033[0m\n")  
     print("\033[1;32m7️⃣  📊   - Analyze voice from audio\033[0m\n")  
-    print("\033[1;31m8️⃣ 🚪    - Exit\033[0m\n")  
-    print("\033[1;34m=========================\033[0m\n")  
+    print("\033[1;32m8️⃣  🎥📄 - Transcribe ALL video files from directory\033[0m\n")  
+    print("\033[1;31m9️⃣ 🚪    - Exit\033[0m\n")  
+    print("\033[1;34m=========================\033[0m\n")
