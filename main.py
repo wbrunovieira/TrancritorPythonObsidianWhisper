@@ -1,9 +1,12 @@
+# main.py
+
 from menu import display_menu
 from transcription import transcribe_audio
 from file_manager import process_multiple_files, get_audio_files, save_transcription
 from file_manager import process_video_file
 from utils import get_user_choice
 from config import AUDIO_DIRECTORY, VIDEO_DIRECTORY
+from youtube_downloader import download_youtube_video
 
 import os
 
@@ -22,8 +25,8 @@ def process_audio_files():
 if __name__ == "__main__":
     while True:
         display_menu()
-        choice = get_user_choice("👉 Please select an option (1-9): ", 
-                                 {'1', '2', '3', '4', '5', '6', '7', '8', '9'})
+        choice = get_user_choice("👉 Please select an option (1-10): ", 
+                           {'1', '2', '3', '4', '5', '6', '7', '8', '9', '10'})
         
         if choice == '1':
             print("🟢 Option 1: Transcribe from audio file selected.")
@@ -126,3 +129,28 @@ if __name__ == "__main__":
         elif choice == '9':
             print("🏁 Exiting the transcriber. Goodbye!")
             break
+        
+      
+        elif choice == '10':
+            print("🟢 Opção 10: Transcrever vídeo do YouTube a partir de link.")
+            youtube_url = input("👉 Insira o link do YouTube: ")
+            
+           
+            video_path = download_youtube_video(youtube_url, VIDEO_DIRECTORY)
+            print(f"🎥 Vídeo baixado em: {video_path}")
+            if video_path is None:
+              print("❌ O download do vídeo falhou. Abortando o processo de transcrição.")
+              continue 
+            
+            # Extrai o áudio do vídeo baixado e salva no diretório de áudios (AUDIO_DIRECTORY)
+            from transcription import extract_audio_from_video, transcribe_audio
+            audio_path = extract_audio_from_video(video_path, AUDIO_DIRECTORY)
+            print(f"🔊 Áudio extraído em: {audio_path}")
+            
+            # Transcreve o áudio e salva a transcrição
+            transcription = transcribe_audio(audio_path)
+            
+            # Utilize save_transcription do file_manager para salvar a transcrição
+            from file_manager import save_transcription
+            import os
+            save_transcription(os.path.basename(video_path), transcription)

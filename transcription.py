@@ -1,3 +1,5 @@
+# transcription.py
+
 import whisper
 import os
 from moviepy.video.io.VideoFileClip import VideoFileClip
