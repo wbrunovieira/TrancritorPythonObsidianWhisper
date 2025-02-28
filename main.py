@@ -7,7 +7,9 @@ from file_manager import process_video_file
 from utils import get_user_choice
 from config import AUDIO_DIRECTORY, VIDEO_DIRECTORY
 from youtube_downloader import download_youtube_video
-
+from system_audio import record_system_audio_until_stop
+from transcription import transcribe_audio
+from file_manager import save_transcription
 import os
 
 def process_audio_files():
@@ -88,9 +90,16 @@ if __name__ == "__main__":
                 from transcription import extract_audio_from_video
                 extract_audio_from_video(video_path, AUDIO_DIRECTORY)
         
+
         elif choice == '5':
-            print("🟢 Option 5: Transcribe from computer audio output selected.")
-            # Implemente aqui a funcionalidade desejada para capturar áudio da saída do computador
+            audio_path = record_system_audio_until_stop()
+    
+            if audio_path:
+                print("🔄 Iniciando a transcrição...")
+
+                transcription = transcribe_audio(audio_path)
+                save_transcription("system_audio.md", transcription)
+                print("✅ Transcrição salva em: ./transcriptions/system_audio.md")
         
         elif choice == '6':
             print("🟢 Option 6: Transcribe from local environment audio selected.")
