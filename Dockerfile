@@ -2,7 +2,6 @@
 FROM python:3.11-slim AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    git \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
@@ -45,7 +44,7 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     DATA_DIR=/data \
     REDIS_URL=redis://redis:6379/0 \
-    WHISPER_MODEL=base \
+    WHISPER_MODEL=large-v3-turbo \
     LOG_LEVEL=INFO
 
 EXPOSE 8000
