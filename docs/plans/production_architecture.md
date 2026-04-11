@@ -59,14 +59,14 @@ GET    /ready                             # readiness (Redis + modelo)
 | Opção original | Rota | Situação |
 |---|---|---|
 | 1. Transcrever áudio | `POST /transcriptions/audio` | ✅ fase 5 |
-| 2. Múltiplos áudios | `POST /transcriptions/audio/batch` | 🔲 fase 7 |
+| 2. Múltiplos áudios | `POST /transcriptions/audio/batch` | ✅ fase 7 |
 | 3. Transcrever vídeo | `POST /transcriptions/video` | ✅ fase 5 |
-| 4. Extrair áudio de vídeo | `POST /transcriptions/video/extract` | 🔲 fase 7 |
+| 4. Extrair áudio de vídeo | `POST /transcriptions/video/extract` | ✅ fase 7 |
 | 5. Gravar áudio do sistema | — | ⛔ só faz sentido em desktop local |
 | 6. Áudio do ambiente local | — | ⛔ incompleto, descartado |
 | 7. Analisar voz | — | ⛔ `voice_analysis.py` não existe |
-| 8. Todos os vídeos da pasta | `POST /transcriptions/video/batch` | 🔲 fase 7 |
-| 10. YouTube | `POST /transcriptions/video/url` | ⚠️ rota existe, yt-dlp na fase 7 |
+| 8. Todos os vídeos da pasta | `POST /transcriptions/video/batch` | ✅ fase 7 |
+| 10. YouTube | `POST /transcriptions/video/url` | ⚠️ rota existe, yt-dlp pendente (fase 8) |
 
 ### Fluxo de um job
 ```
@@ -128,8 +128,6 @@ transcritor/
 │       │   └── routers/
 │       │       ├── transcriptions.py
 │       │       └── health.py
-│       └── cli/
-│           └── commands.py
 │
 └── tests/
     ├── conftest.py
@@ -449,7 +447,7 @@ tests/e2e/
 
 ---
 
-## Fase 7 — Rotas completas do backend
+## Fase 7 — Rotas completas do backend ✅
 
 > **CLI (Click) descartado.** O app é um backend puro — todas as funcionalidades
 > são expostas via rotas REST. Futuramente um frontend consumirá esta API.
@@ -457,71 +455,91 @@ tests/e2e/
 **Objetivo:** cobrir todas as operações que existiam no menu original como rotas HTTP.
 Deletar o código legado do menu.
 
-**O que será construído:**
+**O que foi construído:**
 
-- `api/routers/transcriptions.py` — novas rotas:
-  - `POST /transcriptions/audio/batch` — múltiplos uploads de áudio
+- `api/routers/transcriptions.py` — 4 novas rotas + paginação:
+  - `POST /transcriptions/audio/batch` — múltiplos uploads de áudio, valida todos antes de submeter
   - `POST /transcriptions/video/batch` — múltiplos uploads de vídeo
-  - `POST /transcriptions/video/extract` — extrai áudio sem transcrever
-  - `GET  /transcriptions` — lista jobs recentes (paginado, `?limit=20&offset=0`)
-- `sources/youtube.py` — yt-dlp substituindo pytube quebrado
-- Deletar código morto: `main.py`, `menu.py`, `utils.py`, `youtube_downloader.py`
+  - `POST /transcriptions/video/extract` — extrai áudio de vídeo sem transcrever (`source_type="extract"`)
+  - `GET  /transcriptions` — lista jobs paginada (`?page=1&page_size=20`)
+- `api/schemas.py` — `BatchJobsResponse`, `JobListResponse` adicionados; `TranscriptionResultResponse.audio_path` exposto
+- `core/models.py` — `TranscriptionResult.audio_path: str | None` adicionado
+- `storage/job_store.py` — `save()` indexa em sorted set Redis (`ZADD jobs:all`); `list_jobs(page, page_size)` com `ZREVRANGE`
+- `services/transcription_service.py` — `list_jobs()` e `submit_batch()` adicionados
+- `workers/tasks.py` — `run_extraction()` função pura (sem engine Whisper); `_build_source("extract")` suportado; `transcribe_task` ramifica para `run_extraction` quando `source_type="extract"`
 
-**Novas rotas em detalhe:**
+**Código legado deletado** (todos os arquivos raiz do menu CLI):
+`main.py`, `menu.py`, `utils.py`, `youtube_downloader.py`, `config.py`, `file_manager.py`, `transcription.py`, `system_audio.py`
+
+**Rotas implementadas:**
 
 ```
 POST /transcriptions/audio/batch
-  body: multipart com N arquivos
-  response: { "jobs": [{ "job_id": "...", "filename": "...", "status": "pending" }] }
+  body: multipart com N arquivos (campo "files")
+  response 202: { "jobs": [{ "job_id": "...", "status": "pending" }, ...] }
+  response 422: se qualquer arquivo tiver formato inválido (rejeita o lote todo)
 
 POST /transcriptions/video/batch
-  body: multipart com N vídeos
-  response: { "jobs": [...] }
+  body: multipart com N vídeos (campo "files")
+  response 202: { "jobs": [...] }
 
 POST /transcriptions/video/extract
-  body: multipart (arquivo) ou JSON { "url": "..." }
-  response: { "job_id": "...", "status": "pending" }
-  # o resultado em /result retorna { "audio_path": "..." } ao invés de texto
+  body: multipart (campo "file") — apenas vídeo
+  response 202: { "job_id": "...", "status": "pending" }
+  # resultado via GET /transcriptions/{id}/result: { "audio_path": "/data/audio/xxx.wav" }
 
-GET /transcriptions?limit=20&offset=0
-  response: { "items": [...], "total": N, "limit": 20, "offset": 0 }
+GET /transcriptions?page=1&page_size=20
+  response 200: { "jobs": [...], "page": 1, "page_size": 20, "total": N }
 ```
 
-**TDD — testes a escrever primeiro:**
+**Diferenças em relação ao planejado:**
+- Paginação usa `page` + `page_size` (em vez de `limit` + `offset`) — mais legível
+- `sources/youtube.py` com yt-dlp **não implementado** nesta fase — a rota `/video/url` existe mas yt-dlp fica para a Fase 8
+- Todos os outros arquivos legados da raiz também foram deletados (não apenas os 4 planejados)
+
+**Testes escritos:**
 ```
-tests/integration/
-└── test_api_batch.py
-    ├── test_audio_batch_returns_202_with_job_list
-    ├── test_audio_batch_creates_one_job_per_file
-    ├── test_video_batch_returns_202_with_job_list
-    ├── test_video_extract_returns_202
-    ├── test_list_jobs_returns_paginated_results
-    ├── test_list_jobs_respects_limit_param
-    └── test_youtube_url_dispatches_video_url_source
+tests/integration/test_api_phase7.py   — 28 testes
+tests/unit/test_tasks.py               — 8 novos testes (run_extraction + _build_source extract)
+tests/unit/test_job_store.py           — 9 novos testes (list_jobs + zadd)
 ```
 
 **Critério de aceite da fase:**
-- [ ] `pytest tests/unit/ tests/integration/` passa com 0 falhas
-- [ ] `POST /transcriptions/audio/batch` com 3 arquivos retorna 3 job_ids
-- [ ] `POST /transcriptions/video/url` com link do YouTube cria job (yt-dlp)
-- [ ] `GET /transcriptions` retorna lista paginada
-- [ ] `main.py`, `menu.py`, `utils.py`, `youtube_downloader.py` deletados
-- [ ] Swagger em `/docs` mostra todas as rotas documentadas
-- [ ] Código revisado e push para `main`
+- [x] `pytest tests/unit/ tests/integration/` — 201 testes passando
+- [x] `POST /transcriptions/audio/batch` com 2 arquivos retorna 2 job_ids
+- [x] `POST /transcriptions/video/extract` submete `source_type="extract"`, resultado inclui `audio_path`
+- [x] `GET /transcriptions` retorna lista paginada com `total`, `page`, `page_size`
+- [x] Todos os arquivos legados do menu CLI deletados
+- [x] Swagger em `/docs` mostra todas as rotas documentadas automaticamente
+- [x] Código revisado e push para `main`
 
 ---
 
-## Fase 8 — Logging e hardening
+## Fase 8 — yt-dlp, logging e hardening
 
-**Objetivo:** logging estruturado, tratamento de erros consistente e atualização da documentação.
+**Objetivo:** integrar suporte real a YouTube via yt-dlp, adicionar logging estruturado e garantir robustez em produção.
 
 **O que será feito:**
-- Substituir todos os `print()` restantes por `logging` estruturado (stdlib logging com formato JSON em produção)
-- Garantir que todas as exceções retornam mensagens úteis na API (sem stack traces expostos)
+
+- `sources/youtube.py` — `YouTubeSource(url).acquire()` usando yt-dlp (substitui pytube quebrado)
+  - `POST /transcriptions/video/url` passa a suportar URLs do YouTube automaticamente
+- Logging estruturado: substituir todos os `print()` por `logging` (formato JSON em produção, texto em dev)
+- Garantir que todas as exceções retornam mensagens úteis na API (sem stack traces expostos ao cliente)
 - Atualizar `CLAUDE.md` com a arquitetura final completa
-- Revisar `pyproject.toml` — remover deps não utilizados após deleção do código legado
+- Revisar `pyproject.toml` — confirmar deps após remoção do código legado
+
+**TDD — testes a escrever primeiro:**
+```
+tests/unit/
+└── test_youtube_source.py
+    ├── test_acquire_calls_yt_dlp              # mock yt_dlp.YoutubeDL
+    ├── test_acquire_returns_audio_path
+    ├── test_acquire_raises_on_unavailable_url # vídeo privado / removido
+    └── test_invalid_url_raises_source_error
+```
 
 **Critério de aceite da fase:**
+- [ ] `POST /transcriptions/video/url` com URL do YouTube cria e processa job
 - [ ] Nenhum `print()` no código de produção (`src/`)
 - [ ] Erros da API retornam JSON estruturado: `{ "detail": "mensagem clara" }`
 - [ ] `pytest` (todas as suites exceto e2e) passa sem falhas
@@ -533,16 +551,16 @@ tests/integration/
 
 ## Resumo das fases
 
-| Fase | Entrega | Testes |
-|---|---|---|
-| 1 | Domínio, config, engine Whisper | Unit: models, engine |
-| 2 | Sources (file, url, video) | Unit: todos os sources |
-| 3 | Storage, TranscriptionService | Unit: store, service |
-| 4 | Workers Celery | Unit + Integration: tasks |
-| 5 | API FastAPI com todas as rotas | Integration: todos os endpoints |
-| 6 | Docker, ambiente de produção | E2E: pipeline completo |
-| 7 | CLI Click | Unit: comandos |
-| 8 | Limpeza, YouTube, logging | Todas as suites |
+| Fase | Entrega | Status | Testes |
+|---|---|---|---|
+| 1 | Domínio, config, engine Whisper | ✅ | Unit: models, engine |
+| 2 | Sources (file, url, video) | ✅ | Unit: todos os sources |
+| 3 | Storage, TranscriptionService | ✅ | Unit: store, service |
+| 4 | Workers Celery | ✅ | Unit + Integration: tasks |
+| 5 | API FastAPI com rotas base | ✅ | Integration: todos os endpoints |
+| 6 | Docker, ambiente de produção | ✅ | E2E: pipeline completo |
+| 7 | Rotas completas do backend, remoção do legado | ✅ | 201 testes passando |
+| 8 | yt-dlp YouTube, logging estruturado, hardening | 🔲 | Todas as suites |
 
 ---
 
@@ -555,11 +573,12 @@ feat(phase-3): add storage layer and transcription service
 feat(phase-4): add celery workers and async job processing
 feat(phase-5): add fastapi with transcription routes
 feat(phase-6): add docker compose for production deployment
-feat(phase-7): replace interactive menu with click cli
-feat(phase-8): add youtube support, structured logging, cleanup
+feat(phase-7): add batch, extract, list-jobs routes; remove legacy CLI files
+feat(phase-8): add yt-dlp youtube support, structured logging, hardening
 ```
 
 ---
 
 *Documento criado em: 2026-04-11*  
+*Última atualização: 2026-04-11 — Fase 7 concluída (201 testes, legado removido)*  
 *Atualizar este documento ao final de cada fase com o que mudou em relação ao planejado.*
