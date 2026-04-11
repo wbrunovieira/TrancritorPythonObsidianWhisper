@@ -21,6 +21,7 @@ class TranscriptionJob(BaseModel):
 
 
 class TranscriptionResult(BaseModel):
-    text: str
+    text: str = ""
     language: str | None = None
     duration_seconds: float | None = None
+    audio_path: str | None = None

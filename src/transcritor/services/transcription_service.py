@@ -33,6 +33,12 @@ class TranscriptionService:
     def get_job(self, job_id: str) -> TranscriptionJob:
         return self._job_store.load(job_id)
 
+    def submit_batch(self, source_type: str, items: list[dict]) -> list[TranscriptionJob]:
+        return [self.submit_job(source_type, kwargs) for kwargs in items]
+
+    def list_jobs(self, page: int = 1, page_size: int = 20) -> dict:
+        return self._job_store.list_jobs(page=page, page_size=page_size)
+
     def get_result(self, job_id: str) -> TranscriptionResult:
         job = self._job_store.load(job_id)
         if job.status != JobStatus.DONE:

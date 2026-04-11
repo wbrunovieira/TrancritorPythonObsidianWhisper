@@ -1,11 +1,13 @@
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 
 from transcritor.api.dependencies import get_transcription_service
 from transcritor.api.schemas import (
+    BatchJobsResponse,
     JobCreatedResponse,
+    JobListResponse,
     JobStatusResponse,
     TranscriptionResultResponse,
     UrlTranscriptionRequest,
@@ -92,6 +94,85 @@ def transcribe_video_url(
 
 
 # ---------------------------------------------------------------------------
+# Batch endpoints
+# ---------------------------------------------------------------------------
+
+@router.post("/audio/batch", status_code=202, response_model=BatchJobsResponse)
+async def transcribe_audio_batch(
+    files: list[UploadFile] = File(...),
+    service: TranscriptionService = Depends(get_transcription_service),
+    settings: Settings = Depends(get_settings),
+) -> BatchJobsResponse:
+    for f in files:
+        _validate_extension(f.filename or "", SUPPORTED_AUDIO_EXTENSIONS)
+    jobs = []
+    for f in files:
+        content = await f.read()
+        saved_path = _save_upload(f, content, settings)
+        job = service.submit_job("file", {"path": str(saved_path)})
+        jobs.append(JobCreatedResponse(job_id=job.job_id, status=job.status))
+    return BatchJobsResponse(jobs=jobs)
+
+
+@router.post("/video/batch", status_code=202, response_model=BatchJobsResponse)
+async def transcribe_video_batch(
+    files: list[UploadFile] = File(...),
+    service: TranscriptionService = Depends(get_transcription_service),
+    settings: Settings = Depends(get_settings),
+) -> BatchJobsResponse:
+    for f in files:
+        _validate_extension(f.filename or "", SUPPORTED_VIDEO_EXTENSIONS)
+    jobs = []
+    for f in files:
+        content = await f.read()
+        saved_path = _save_upload(f, content, settings)
+        job = service.submit_job("video", {"path": str(saved_path)})
+        jobs.append(JobCreatedResponse(job_id=job.job_id, status=job.status))
+    return BatchJobsResponse(jobs=jobs)
+
+
+@router.post("/video/extract", status_code=202, response_model=JobCreatedResponse)
+async def extract_audio_from_video(
+    file: UploadFile = File(...),
+    service: TranscriptionService = Depends(get_transcription_service),
+    settings: Settings = Depends(get_settings),
+) -> JobCreatedResponse:
+    _validate_extension(file.filename or "", SUPPORTED_VIDEO_EXTENSIONS)
+    content = await file.read()
+    saved_path = _save_upload(file, content, settings)
+    job = service.submit_job("extract", {"path": str(saved_path)})
+    return JobCreatedResponse(job_id=job.job_id, status=job.status)
+
+
+# ---------------------------------------------------------------------------
+# List jobs
+# ---------------------------------------------------------------------------
+
+@router.get("", response_model=JobListResponse)
+def list_jobs(
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    service: TranscriptionService = Depends(get_transcription_service),
+) -> JobListResponse:
+    result = service.list_jobs(page=page, page_size=page_size)
+    return JobListResponse(
+        jobs=[
+            JobStatusResponse(
+                job_id=j.job_id,
+                status=j.status,
+                created_at=j.created_at,
+                completed_at=j.completed_at,
+                error=j.error,
+            )
+            for j in result["jobs"]
+        ],
+        page=result["page"],
+        page_size=result["page_size"],
+        total=result["total"],
+    )
+
+
+# ---------------------------------------------------------------------------
 # Job status and result
 # ---------------------------------------------------------------------------
 
@@ -129,4 +210,5 @@ def get_job_result(
         text=result.text,
         language=result.language,
         duration_seconds=result.duration_seconds,
+        audio_path=result.audio_path,
     )

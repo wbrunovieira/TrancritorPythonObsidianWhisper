@@ -24,9 +24,21 @@ class JobStatusResponse(BaseModel):
 
 class TranscriptionResultResponse(BaseModel):
     job_id: str
-    text: str
+    text: str = ""
     language: str | None = None
     duration_seconds: float | None = None
+    audio_path: str | None = None
+
+
+class BatchJobsResponse(BaseModel):
+    jobs: list[JobCreatedResponse]
+
+
+class JobListResponse(BaseModel):
+    jobs: list[JobStatusResponse]
+    page: int
+    page_size: int
+    total: int
 
 
 class HealthResponse(BaseModel):

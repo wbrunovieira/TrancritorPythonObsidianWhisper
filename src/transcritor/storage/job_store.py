@@ -10,12 +10,21 @@ class JobStore:
 
     def save(self, job: TranscriptionJob) -> None:
         self._redis.set(f"job:{job.job_id}", job.model_dump_json())
+        self._redis.zadd("jobs:all", {job.job_id: job.created_at.timestamp()})
 
     def load(self, job_id: str) -> TranscriptionJob:
         data = self._redis.get(f"job:{job_id}")
         if data is None:
             raise JobNotFoundError(f"Job not found: {job_id}")
         return TranscriptionJob.model_validate_json(data)
+
+    def list_jobs(self, page: int = 1, page_size: int = 20) -> dict:
+        total = self._redis.zcard("jobs:all")
+        start = (page - 1) * page_size
+        stop = start + page_size - 1
+        job_ids = self._redis.zrevrange("jobs:all", start, stop)
+        jobs = [self.load(jid.decode() if isinstance(jid, bytes) else jid) for jid in job_ids]
+        return {"jobs": jobs, "page": page, "page_size": page_size, "total": total}
 
     def update_status(
         self, job_id: str, status: JobStatus, error: str | None = None

@@ -40,6 +40,15 @@ def _build_source(source_type: str, source_kwargs: dict):
         video_path = url_source.acquire()
         return VideoSource(video_path=video_path, output_dir=settings.audio_dir)
 
+    if source_type == "extract":
+        from transcritor.sources.video_source import VideoSource
+        from transcritor.config import get_settings
+        settings = get_settings()
+        return VideoSource(
+            video_path=Path(source_kwargs["path"]),
+            output_dir=settings.audio_dir,
+        )
+
     raise ValueError(f"Unknown source type: {source_type}")
 
 
@@ -51,6 +60,7 @@ def run_transcription(
     file_store: FileStore,
 ) -> None:
     """Lógica pura de execução — sem Celery, testável diretamente."""
+    from transcritor.core.models import TranscriptionResult
     job_store.update_status(job_id, JobStatus.PROCESSING)
     try:
         audio_path = source.acquire()
@@ -62,16 +72,38 @@ def run_transcription(
         raise
 
 
+def run_extraction(
+    job_id: str,
+    source,
+    job_store: JobStore,
+    file_store: FileStore,
+) -> None:
+    """Extrai áudio de um vídeo sem transcrever — lógica pura, testável sem Celery."""
+    from transcritor.core.models import TranscriptionResult
+    job_store.update_status(job_id, JobStatus.PROCESSING)
+    try:
+        audio_path = source.acquire()
+        result = TranscriptionResult(audio_path=str(audio_path))
+        file_store.save_result(job_id, result)
+        job_store.update_status(job_id, JobStatus.DONE)
+    except Exception as e:
+        job_store.update_status(job_id, JobStatus.FAILED, error=str(e))
+        raise
+
+
 @celery_app.task(name="transcritor.workers.tasks.transcribe_task", bind=True, max_retries=3)
 def transcribe_task(self, job_id: str, source_type: str, source_kwargs: dict) -> None:
-    """Task Celery — monta as dependências e delega para run_transcription."""
+    """Task Celery — monta as dependências e delega para run_transcription ou run_extraction."""
     from transcritor.config import get_settings
 
     settings = get_settings()
     redis_client = redis.from_url(settings.redis_url)
     job_store = JobStore(redis_client)
     file_store = FileStore(settings.transcripts_dir)
-    engine = get_engine()
     source = _build_source(source_type, source_kwargs)
 
-    run_transcription(job_id, source, engine, job_store, file_store)
+    if source_type == "extract":
+        run_extraction(job_id, source, job_store, file_store)
+    else:
+        engine = get_engine()
+        run_transcription(job_id, source, engine, job_store, file_store)

@@ -165,6 +165,119 @@ class TestTranscribeTask:
         assert call_order == [JobStatus.PROCESSING, JobStatus.DONE]
 
 
+# ---------------------------------------------------------------------------
+# Testes de run_extraction
+# ---------------------------------------------------------------------------
+
+class TestRunExtraction:
+    def test_updates_status_to_processing(self):
+        from transcritor.workers.tasks import run_extraction
+
+        job_store = MagicMock()
+        file_store = MagicMock()
+        source = _make_fake_source("/tmp/extracted.wav")
+
+        run_extraction("job123", source, job_store, file_store)
+
+        job_store.update_status.assert_any_call("job123", JobStatus.PROCESSING)
+
+    def test_calls_source_acquire(self):
+        from transcritor.workers.tasks import run_extraction
+
+        job_store = MagicMock()
+        file_store = MagicMock()
+        source = _make_fake_source("/tmp/extracted.wav")
+
+        run_extraction("job123", source, job_store, file_store)
+
+        source.acquire.assert_called_once()
+
+    def test_saves_result_with_audio_path(self):
+        from transcritor.workers.tasks import run_extraction
+
+        job_store = MagicMock()
+        file_store = MagicMock()
+        source = _make_fake_source("/tmp/extracted.wav")
+
+        run_extraction("job123", source, job_store, file_store)
+
+        file_store.save_result.assert_called_once()
+        _, result = file_store.save_result.call_args[0]
+        assert result.audio_path == "/tmp/extracted.wav"
+
+    def test_updates_status_to_done_on_success(self):
+        from transcritor.workers.tasks import run_extraction
+
+        job_store = MagicMock()
+        file_store = MagicMock()
+        source = _make_fake_source("/tmp/extracted.wav")
+
+        run_extraction("job123", source, job_store, file_store)
+
+        job_store.update_status.assert_called_with("job123", JobStatus.DONE)
+
+    def test_updates_status_to_failed_on_error(self):
+        from transcritor.workers.tasks import run_extraction
+
+        job_store = MagicMock()
+        file_store = MagicMock()
+        source = MagicMock()
+        source.acquire.side_effect = TranscriptionError("video broken")
+
+        with pytest.raises(TranscriptionError):
+            run_extraction("job123", source, job_store, file_store)
+
+        job_store.update_status.assert_called_with(
+            "job123", JobStatus.FAILED, error="video broken"
+        )
+
+    def test_does_not_save_result_on_failure(self):
+        from transcritor.workers.tasks import run_extraction
+
+        job_store = MagicMock()
+        file_store = MagicMock()
+        source = MagicMock()
+        source.acquire.side_effect = TranscriptionError("boom")
+
+        with pytest.raises(TranscriptionError):
+            run_extraction("job123", source, job_store, file_store)
+
+        file_store.save_result.assert_not_called()
+
+    def test_result_has_empty_text(self):
+        from transcritor.workers.tasks import run_extraction
+
+        job_store = MagicMock()
+        file_store = MagicMock()
+        source = _make_fake_source("/tmp/extracted.wav")
+
+        run_extraction("job123", source, job_store, file_store)
+
+        _, result = file_store.save_result.call_args[0]
+        assert result.text == ""
+
+
+# ---------------------------------------------------------------------------
+# Testes do _build_source para tipo "extract"
+# ---------------------------------------------------------------------------
+
+class TestBuildSourceExtract:
+    def test_extract_source_type_recognized(self):
+        """extract não deve lançar ValueError (tipo desconhecido)."""
+        from transcritor.workers.tasks import _build_source
+
+        mock_settings = MagicMock()
+        mock_settings.audio_dir = "/tmp/audio"
+
+        with patch("transcritor.config.get_settings", return_value=mock_settings):
+            with patch("transcritor.sources.video_source.VideoSource") as mock_vs:
+                mock_vs.return_value = MagicMock()
+                try:
+                    _build_source("extract", {"path": "/tmp/video.mp4"})
+                except ValueError as e:
+                    pytest.fail(f"_build_source raised ValueError for 'extract': {e}")
+
+
 class TestCeleryTaskDispatch:
     def test_transcribe_task_is_registered(self):
         from transcritor.workers.celery_app import celery_app

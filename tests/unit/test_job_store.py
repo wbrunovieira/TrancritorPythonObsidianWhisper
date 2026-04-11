@@ -117,3 +117,59 @@ class TestJobStoreUpdateStatus:
         store.update_status("abc123", JobStatus.FAILED, error="something broke")
         saved = json.loads(mock_redis.set.call_args[0][1])
         assert saved["error"] == "something broke"
+
+    def test_save_calls_zadd_for_sorted_set(self, store, mock_redis):
+        store.save(_make_job(job_id="abc123"))
+        mock_redis.zadd.assert_called_once()
+        key = mock_redis.zadd.call_args[0][0]
+        assert key == "jobs:all"
+
+    def test_save_zadd_includes_job_id(self, store, mock_redis):
+        store.save(_make_job(job_id="abc123"))
+        mapping = mock_redis.zadd.call_args[0][1]
+        assert "abc123" in mapping
+
+
+class TestJobStoreListJobs:
+    def _setup_list(self, mock_redis, job_ids: list[str], total: int | None = None):
+        """Configura mock_redis.zcard e zrevrange para simular uma lista de jobs."""
+        jobs = {jid: _make_job(job_id=jid) for jid in job_ids}
+        mock_redis.zcard.return_value = total if total is not None else len(job_ids)
+        mock_redis.zrevrange.return_value = [jid.encode() for jid in job_ids]
+        mock_redis.get.side_effect = lambda key: jobs[key.split(":")[1]].model_dump_json().encode()
+
+    def test_returns_dict_with_jobs_key(self, store, mock_redis):
+        self._setup_list(mock_redis, [])
+        result = store.list_jobs()
+        assert "jobs" in result
+
+    def test_returns_empty_list_when_no_jobs(self, store, mock_redis):
+        self._setup_list(mock_redis, [])
+        result = store.list_jobs()
+        assert result["jobs"] == []
+
+    def test_returns_total(self, store, mock_redis):
+        self._setup_list(mock_redis, ["a", "b"], total=2)
+        result = store.list_jobs()
+        assert result["total"] == 2
+
+    def test_returns_page_and_page_size(self, store, mock_redis):
+        self._setup_list(mock_redis, [])
+        result = store.list_jobs(page=2, page_size=10)
+        assert result["page"] == 2
+        assert result["page_size"] == 10
+
+    def test_returns_correct_number_of_jobs(self, store, mock_redis):
+        self._setup_list(mock_redis, ["a", "b", "c"])
+        result = store.list_jobs()
+        assert len(result["jobs"]) == 3
+
+    def test_calls_zrevrange_with_correct_range(self, store, mock_redis):
+        self._setup_list(mock_redis, [])
+        store.list_jobs(page=1, page_size=20)
+        mock_redis.zrevrange.assert_called_once_with("jobs:all", 0, 19)
+
+    def test_second_page_uses_correct_offset(self, store, mock_redis):
+        self._setup_list(mock_redis, [])
+        store.list_jobs(page=2, page_size=5)
+        mock_redis.zrevrange.assert_called_once_with("jobs:all", 5, 9)
