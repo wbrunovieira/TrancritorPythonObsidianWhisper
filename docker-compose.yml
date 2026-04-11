@@ -46,7 +46,7 @@ services:
       redis:
         condition: service_healthy
     volumes:
-      - whisper_models:/root/.cache/whisper
+      - whisper_models:/home/appuser/.cache/huggingface
       - transcriptions_data:/data/transcripts
       - audio_data:/data/audio
       - video_data:/data/video

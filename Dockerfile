@@ -36,7 +36,8 @@ RUN pip install --no-cache-dir --no-deps -e .
 # Non-root user for security
 RUN useradd --create-home --shell /bin/bash appuser && \
     mkdir -p /data/audio /data/video /data/transcripts && \
-    chown -R appuser:appuser /app /data
+    mkdir -p /home/appuser/.cache/huggingface && \
+    chown -R appuser:appuser /app /data /home/appuser/.cache
 
 USER appuser
 
