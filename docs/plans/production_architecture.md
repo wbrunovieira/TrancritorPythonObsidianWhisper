@@ -180,11 +180,11 @@ tests/unit/
 **Cobertura esperada:** 100% de `core/` e `engine/`
 
 **Critério de aceite da fase:**
-- [ ] `pytest tests/unit/` passa com 0 falhas
-- [ ] `get_engine()` retorna singleton — verificado em teste
-- [ ] `WhisperEngine.transcribe()` com mock retorna `TranscriptionResult` correto
-- [ ] `Settings` lê variáveis de ambiente corretamente
-- [ ] Código revisado e push para `main`
+- [x] `pytest tests/unit/` passa com 0 falhas
+- [x] `get_engine()` retorna singleton — verificado em teste
+- [x] `WhisperEngine.transcribe()` com mock retorna `TranscriptionResult` correto
+- [x] `Settings` lê variáveis de ambiente corretamente
+- [x] Código revisado e push para `main`
 
 ---
 
@@ -221,11 +221,11 @@ tests/unit/
 **Cobertura esperada:** 100% de `sources/` (exceto `system_audio.py` — requer hardware)
 
 **Critério de aceite da fase:**
-- [ ] `pytest tests/unit/` passa com 0 falhas
-- [ ] Nenhum teste importa `torch`, `whisper` ou `moviepy` diretamente
-- [ ] `UnsupportedFormatError` funciona para extensões inválidas em `FileSource`
-- [ ] `UrlSource` funciona com mock de URL — sem chamada HTTP real nos testes
-- [ ] Código revisado e push para `main`
+- [x] `pytest tests/unit/` passa com 0 falhas
+- [x] Nenhum teste importa `torch`, `whisper` ou `moviepy` diretamente
+- [x] `UnsupportedFormatError` funciona para extensões inválidas em `FileSource`
+- [x] `UrlSource` funciona com mock de URL — sem chamada HTTP real nos testes
+- [x] Código revisado e push para `main`
 
 ---
 
@@ -264,11 +264,11 @@ tests/unit/
 **Cobertura esperada:** 100% de `storage/` e `services/`
 
 **Critério de aceite da fase:**
-- [ ] `pytest tests/unit/` passa com 0 falhas
-- [ ] `TranscriptionService` testado com 100% de fakes — zero dependências reais
-- [ ] `FileStore` usa `tmp_path` do pytest — nenhum arquivo criado fora do diretório de teste
-- [ ] `JobStore` mockado — nenhum Redis necessário para rodar os testes
-- [ ] Código revisado e push para `main`
+- [x] `pytest tests/unit/` passa com 0 falhas
+- [x] `TranscriptionService` testado com 100% de fakes — zero dependências reais
+- [x] `FileStore` usa `tmp_path` do pytest — nenhum arquivo criado fora do diretório de teste
+- [x] `JobStore` mockado — nenhum Redis necessário para rodar os testes
+- [x] Código revisado e push para `main`
 
 ---
 
@@ -302,11 +302,11 @@ tests/integration/
 **Cobertura esperada:** 100% de `workers/`
 
 **Critério de aceite da fase:**
-- [ ] `pytest tests/unit/` passa com 0 falhas
-- [ ] `pytest tests/integration/ -m "not slow"` passa com 0 falhas
-- [ ] `transcribe_task` com `ALWAYS_EAGER=True` e engine stubado funciona end-to-end
-- [ ] Worker carrega modelo uma vez — verificado por log/mock de `WhisperEngine.load()`
-- [ ] Código revisado e push para `main`
+- [x] `pytest tests/unit/` passa com 0 falhas
+- [x] `pytest tests/integration/ -m "not slow"` passa com 0 falhas
+- [x] `transcribe_task` com `ALWAYS_EAGER=True` e engine stubado funciona end-to-end
+- [x] Worker carrega modelo uma vez — verificado por log/mock de `WhisperEngine.load()`
+- [x] Código revisado e push para `main`
 
 ---
 
@@ -374,11 +374,11 @@ tests/integration/
 **Cobertura esperada:** 100% de `api/`
 
 **Critério de aceite da fase:**
-- [ ] `pytest tests/integration/` passa com 0 falhas
-- [ ] Nenhum teste de integração sobe Redis real ou worker real
-- [ ] Documentação automática disponível em `http://localhost:8000/docs` (Swagger)
-- [ ] Todos os status HTTP corretos: 202 (criado), 200 (ok), 404 (não encontrado), 409 (conflito), 422 (validação), 503 (serviço indisponível)
-- [ ] Código revisado e push para `main`
+- [x] `pytest tests/integration/` passa com 0 falhas
+- [x] Nenhum teste de integração sobe Redis real ou worker real
+- [x] Documentação automática disponível em `http://localhost:8000/docs` (Swagger)
+- [x] Todos os status HTTP corretos: 202 (criado), 200 (ok), 404 (não encontrado), 409 (conflito), 422 (validação), 503 (serviço indisponível)
+- [x] Código revisado e push para `main`
 
 ---
 
@@ -437,13 +437,13 @@ tests/e2e/
 ```
 
 **Critério de aceite da fase:**
-- [ ] `docker-compose up` sobe sem erros
-- [ ] `curl http://localhost:8000/health` retorna `200`
-- [ ] `curl http://localhost:8000/ready` retorna `200` com Redis rodando
-- [ ] Upload de arquivo de áudio via API processa e retorna transcrição
-- [ ] Modelo do Whisper não é re-baixado em `docker-compose down && up`
-- [ ] `pytest tests/e2e/ -m e2e` passa com ambiente Docker rodando
-- [ ] Código revisado e push para `main`
+- [x] `docker-compose up` sobe sem erros
+- [x] `curl http://localhost:8000/health` retorna `200`
+- [x] `curl http://localhost:8000/ready` retorna `200` com Redis rodando
+- [x] Upload de arquivo de áudio via API processa e retorna transcrição
+- [x] Modelo do Whisper não é re-baixado em `docker-compose down && up`
+- [x] `pytest tests/e2e/ -m e2e` passa com ambiente Docker rodando
+- [x] Código revisado e push para `main`
 
 ---
 
@@ -558,7 +558,7 @@ tests/unit/
 - [x] `pytest tests/unit/ tests/integration/` — 217 testes passando
 - [ ] `pytest tests/e2e/ -m e2e` passa com Docker rodando
 - [x] `CLAUDE.md` atualizado com arquitetura final
-- [ ] Código revisado e push para `main`
+- [x] Código revisado e push para `main`
 
 ---
 
