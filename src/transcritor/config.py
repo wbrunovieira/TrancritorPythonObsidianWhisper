@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     data_dir: Path = Path.home() / ".transcritor"
     redis_url: str = "redis://localhost:6379/0"
     log_level: str = "INFO"
+    api_key: str = ""
 
     @property
     def audio_dir(self) -> Path:

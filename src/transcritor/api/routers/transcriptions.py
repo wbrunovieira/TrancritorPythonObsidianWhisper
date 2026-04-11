@@ -3,7 +3,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 
-from transcritor.api.dependencies import get_transcription_service
+from transcritor.api.dependencies import get_transcription_service, verify_api_key
 from transcritor.api.schemas import (
     BatchJobsResponse,
     JobCreatedResponse,
@@ -16,7 +16,11 @@ from transcritor.config import Settings, get_settings
 from transcritor.core.exceptions import JobNotFoundError, JobNotReadyError
 from transcritor.services.transcription_service import TranscriptionService
 
-router = APIRouter(prefix="/transcriptions", tags=["transcriptions"])
+router = APIRouter(
+    prefix="/transcriptions",
+    tags=["transcriptions"],
+    dependencies=[Depends(verify_api_key)],
+)
 
 SUPPORTED_AUDIO_EXTENSIONS = {".mp3", ".wav", ".m4a", ".flac", ".ogg"}
 SUPPORTED_VIDEO_EXTENSIONS = {".mp4", ".mkv", ".avi", ".mov"}

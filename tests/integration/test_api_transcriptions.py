@@ -76,6 +76,35 @@ async def client(fake_service, tmp_path):
         data_dir=tmp_path,
         redis_url="redis://localhost:6379/0",
         whisper_model="base",
+        api_key="test-secret",
+    )
+    app.dependency_overrides[get_transcription_service] = lambda: fake_service
+    app.dependency_overrides[get_settings] = lambda: test_settings
+    get_settings.cache_clear()
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+        headers={"X-API-Key": "test-secret"},
+    ) as c:
+        yield c
+
+    app.dependency_overrides.clear()
+    get_settings.cache_clear()
+
+
+@pytest.fixture
+async def client_no_auth(fake_service, tmp_path):
+    """Client sem header de autenticação — para testar rejeição."""
+    from transcritor.api.app import app
+    from transcritor.api.dependencies import get_transcription_service
+    from transcritor.config import Settings, get_settings
+
+    test_settings = Settings(
+        data_dir=tmp_path,
+        redis_url="redis://localhost:6379/0",
+        whisper_model="base",
+        api_key="test-secret",
     )
     app.dependency_overrides[get_transcription_service] = lambda: fake_service
     app.dependency_overrides[get_settings] = lambda: test_settings
@@ -330,3 +359,41 @@ class TestGetResult:
         fake_service.preset_result("done-job", TranscriptionResult(text="test"))
         r = await client.get("/transcriptions/done-job/result")
         assert r.json()["job_id"] == "done-job"
+
+
+# ---------------------------------------------------------------------------
+# API Key authentication
+# ---------------------------------------------------------------------------
+
+class TestApiKeyAuth:
+    async def test_missing_key_returns_401(self, client_no_auth):
+        r = await client_no_auth.post("/transcriptions/audio", files=[_audio_file()])
+        assert r.status_code == 401
+
+    async def test_wrong_key_returns_401(self, client_no_auth):
+        r = await client_no_auth.post(
+            "/transcriptions/audio",
+            files=[_audio_file()],
+            headers={"X-API-Key": "wrong-key"},
+        )
+        assert r.status_code == 401
+
+    async def test_correct_key_returns_202(self, client):
+        r = await client.post("/transcriptions/audio", files=[_audio_file()])
+        assert r.status_code == 202
+
+    async def test_health_requires_no_key(self, client_no_auth):
+        r = await client_no_auth.get("/health")
+        assert r.status_code == 200
+
+    async def test_ready_requires_no_key(self, client_no_auth):
+        r = await client_no_auth.get("/ready")
+        assert r.status_code in (200, 503)
+
+    async def test_get_job_status_requires_key(self, client_no_auth):
+        r = await client_no_auth.get("/transcriptions/some-job-id")
+        assert r.status_code == 401
+
+    async def test_get_result_requires_key(self, client_no_auth):
+        r = await client_no_auth.get("/transcriptions/some-job-id/result")
+        assert r.status_code == 401
