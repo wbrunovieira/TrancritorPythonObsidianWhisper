@@ -556,7 +556,7 @@ tests/unit/
 - [x] Nenhum `print()` no código de produção (`src/`)
 - [x] Erros da API retornam JSON estruturado: `{ "detail": "mensagem clara" }` (exception handler global)
 - [x] `pytest tests/unit/ tests/integration/` — 217 testes passando
-- [ ] `pytest tests/e2e/ -m e2e` passa com Docker rodando
+- [x] `pytest tests/e2e/ -m e2e` passa com Docker rodando
 - [x] `CLAUDE.md` atualizado com arquitetura final
 - [x] Código revisado e push para `main`
 
@@ -573,7 +573,7 @@ tests/unit/
 | 5 | API FastAPI com rotas base | ✅ | Integration: todos os endpoints |
 | 6 | Docker, ambiente de produção | ✅ | E2E: pipeline completo |
 | 7 | Rotas completas do backend, remoção do legado | ✅ | 201 testes passando |
-| 8 | yt-dlp YouTube, logging estruturado, hardening | ✅ | 217 testes (e2e pendente Docker) |
+| 8 | yt-dlp YouTube, logging estruturado, hardening | ✅ | 217 unit+integration + 11 e2e (228 total) |
 
 ---
 
@@ -593,5 +593,5 @@ feat(phase-8): add yt-dlp youtube support, structured logging, hardening
 ---
 
 *Documento criado em: 2026-04-11*  
-*Última atualização: 2026-04-11 — Fase 8 concluída: yt-dlp/YouTubeSource, logging estruturado, hardening, CLAUDE.md atualizado (217 testes)*  
+*Última atualização: 2026-04-11 — Fase 8 concluída: yt-dlp/YouTubeSource, logging estruturado, hardening, CLAUDE.md atualizado (228 testes — 217 unit+integration + 11 e2e)*  
 *Atualizar este documento ao final de cada fase com o que mudou em relação ao planejado.*
