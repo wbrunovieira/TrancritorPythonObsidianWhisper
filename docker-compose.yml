@@ -1,0 +1,54 @@
+services:
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build: .
+    command: uvicorn transcritor.api.app:app --host 0.0.0.0 --port 8000 --workers 2
+    ports:
+      - "8000:8000"
+    env_file: .env
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - transcriptions_data:/data/transcripts
+      - audio_data:/data/audio
+      - video_data:/data/video
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  worker:
+    build: .
+    command: celery -A transcritor.workers.celery_app worker --loglevel=info --concurrency=2
+    env_file: .env
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - whisper_models:/root/.cache/whisper
+      - transcriptions_data:/data/transcripts
+      - audio_data:/data/audio
+      - video_data:/data/video
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  whisper_models:       # modelo Whisper persistido — não re-baixa entre deploys
+  transcriptions_data:
+  audio_data:
+  video_data:

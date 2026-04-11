@@ -10,7 +10,7 @@ from transcritor.api.schemas import (
     TranscriptionResultResponse,
     UrlTranscriptionRequest,
 )
-from transcritor.config import get_settings
+from transcritor.config import Settings, get_settings
 from transcritor.core.exceptions import JobNotFoundError, JobNotReadyError
 from transcritor.services.transcription_service import TranscriptionService
 
@@ -20,8 +20,7 @@ SUPPORTED_AUDIO_EXTENSIONS = {".mp3", ".wav", ".m4a", ".flac", ".ogg"}
 SUPPORTED_VIDEO_EXTENSIONS = {".mp4", ".mkv", ".avi", ".mov"}
 
 
-def _save_upload(file: UploadFile, content: bytes) -> Path:
-    settings = get_settings()
+def _save_upload(file: UploadFile, content: bytes, settings: Settings) -> Path:
     settings.audio_dir.mkdir(parents=True, exist_ok=True)
     suffix = Path(file.filename or "").suffix.lower()
     dest = settings.audio_dir / f"{uuid4().hex}{suffix}"
@@ -48,10 +47,11 @@ def _validate_extension(filename: str, supported: set[str]) -> str:
 async def transcribe_audio_upload(
     file: UploadFile = File(...),
     service: TranscriptionService = Depends(get_transcription_service),
+    settings: Settings = Depends(get_settings),
 ) -> JobCreatedResponse:
     _validate_extension(file.filename or "", SUPPORTED_AUDIO_EXTENSIONS)
     content = await file.read()
-    saved_path = _save_upload(file, content)
+    saved_path = _save_upload(file, content, settings)
     job = service.submit_job("file", {"path": str(saved_path)})
     return JobCreatedResponse(job_id=job.job_id, status=job.status)
 
@@ -73,10 +73,11 @@ def transcribe_audio_url(
 async def transcribe_video_upload(
     file: UploadFile = File(...),
     service: TranscriptionService = Depends(get_transcription_service),
+    settings: Settings = Depends(get_settings),
 ) -> JobCreatedResponse:
     _validate_extension(file.filename or "", SUPPORTED_VIDEO_EXTENSIONS)
     content = await file.read()
-    saved_path = _save_upload(file, content)
+    saved_path = _save_upload(file, content, settings)
     job = service.submit_job("video", {"path": str(saved_path)})
     return JobCreatedResponse(job_id=job.job_id, status=job.status)
 

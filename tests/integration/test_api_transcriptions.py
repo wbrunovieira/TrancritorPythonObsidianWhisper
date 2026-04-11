@@ -67,14 +67,25 @@ def fake_service():
 
 
 @pytest.fixture
-async def client(fake_service):
+async def client(fake_service, tmp_path):
     from transcritor.api.app import app
     from transcritor.api.dependencies import get_transcription_service
+    from transcritor.config import Settings, get_settings
 
+    test_settings = Settings(
+        data_dir=tmp_path,
+        redis_url="redis://localhost:6379/0",
+        whisper_model="base",
+    )
     app.dependency_overrides[get_transcription_service] = lambda: fake_service
+    app.dependency_overrides[get_settings] = lambda: test_settings
+    get_settings.cache_clear()
+
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         yield c
+
     app.dependency_overrides.clear()
+    get_settings.cache_clear()
 
 
 def _audio_file(filename="audio.mp3", content=b"fake audio"):
