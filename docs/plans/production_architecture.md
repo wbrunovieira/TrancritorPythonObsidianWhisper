@@ -20,26 +20,53 @@
 | Componente | Tecnologia |
 |---|---|
 | API | FastAPI |
+| Documentação | Swagger UI — automático via FastAPI em `/docs`, sem lib extra |
 | Fila de jobs | Celery + Redis |
 | Configuração | pydantic-settings |
-| CLI (uso local) | Click |
 | YouTube | yt-dlp (substitui pytube) |
 | Testes | pytest + pytest-asyncio + httpx |
 | Deploy | Docker Compose |
 
-### Rotas da API
-```
-POST   /transcriptions/audio           # upload de arquivo de áudio
-POST   /transcriptions/audio/url       # transcrição via URL externa
-POST   /transcriptions/video           # upload de arquivo de vídeo
-POST   /transcriptions/video/url       # transcrição de vídeo via URL externa
+> **Nota:** CLI (Click) foi descartado. O app é exclusivamente um backend REST.
+> Futuramente um frontend pode consumir a mesma API.
 
-GET    /transcriptions/{job_id}        # consulta status do job
-GET    /transcriptions/{job_id}/result # busca resultado quando concluído
+### Rotas da API — completas
 
-GET    /health                         # liveness
-GET    /ready                          # readiness (Redis + modelo)
 ```
+# ── Transcrição de áudio ──────────────────────────────────────────
+POST   /transcriptions/audio              # upload de arquivo de áudio
+POST   /transcriptions/audio/url          # via URL externa (Google Drive, etc)
+POST   /transcriptions/audio/batch        # upload de múltiplos arquivos
+
+# ── Transcrição de vídeo ──────────────────────────────────────────
+POST   /transcriptions/video              # upload de arquivo de vídeo
+POST   /transcriptions/video/url          # via URL externa ou YouTube (yt-dlp)
+POST   /transcriptions/video/batch        # upload de múltiplos vídeos
+POST   /transcriptions/video/extract      # só extrai o áudio, sem transcrever
+
+# ── Consulta de jobs ──────────────────────────────────────────────
+GET    /transcriptions                    # lista jobs recentes (paginado)
+GET    /transcriptions/{job_id}           # status do job
+GET    /transcriptions/{job_id}/result    # resultado quando concluído
+
+# ── Infraestrutura ────────────────────────────────────────────────
+GET    /health                            # liveness
+GET    /ready                             # readiness (Redis + modelo)
+```
+
+### Mapeamento: opções originais → rotas
+
+| Opção original | Rota | Situação |
+|---|---|---|
+| 1. Transcrever áudio | `POST /transcriptions/audio` | ✅ fase 5 |
+| 2. Múltiplos áudios | `POST /transcriptions/audio/batch` | 🔲 fase 7 |
+| 3. Transcrever vídeo | `POST /transcriptions/video` | ✅ fase 5 |
+| 4. Extrair áudio de vídeo | `POST /transcriptions/video/extract` | 🔲 fase 7 |
+| 5. Gravar áudio do sistema | — | ⛔ só faz sentido em desktop local |
+| 6. Áudio do ambiente local | — | ⛔ incompleto, descartado |
+| 7. Analisar voz | — | ⛔ `voice_analysis.py` não existe |
+| 8. Todos os vídeos da pasta | `POST /transcriptions/video/batch` | 🔲 fase 7 |
+| 10. YouTube | `POST /transcriptions/video/url` | ⚠️ rota existe, yt-dlp na fase 7 |
 
 ### Fluxo de um job
 ```
@@ -422,65 +449,84 @@ tests/e2e/
 
 ---
 
-## Fase 7 — CLI: substituição do menu interativo
+## Fase 7 — Rotas completas do backend
 
-**Objetivo:** substituir `main.py` + `menu.py` + `utils.py` pelo CLI em Click. Mantém uso local sem precisar do Docker.
+> **CLI (Click) descartado.** O app é um backend puro — todas as funcionalidades
+> são expostas via rotas REST. Futuramente um frontend consumirá esta API.
+
+**Objetivo:** cobrir todas as operações que existiam no menu original como rotas HTTP.
+Deletar o código legado do menu.
 
 **O que será construído:**
-- `cli/commands.py` — comandos Click que chamam `TranscriptionService` diretamente
-- Entrypoint em `pyproject.toml`: `transcritor` como comando de terminal
 
-**Comandos CLI:**
-```bash
-transcritor transcribe audio <arquivo>        # transcreve arquivo de áudio local
-transcritor transcribe video <arquivo>        # transcreve arquivo de vídeo local
-transcritor transcribe url <url>              # transcreve de URL externa
-transcritor record                            # grava áudio do sistema e transcreve
-transcritor batch <diretório>                 # transcreve todos os arquivos de um diretório
-transcritor job status <job_id>              # consulta status de um job
-transcritor job result <job_id>              # busca resultado de um job
+- `api/routers/transcriptions.py` — novas rotas:
+  - `POST /transcriptions/audio/batch` — múltiplos uploads de áudio
+  - `POST /transcriptions/video/batch` — múltiplos uploads de vídeo
+  - `POST /transcriptions/video/extract` — extrai áudio sem transcrever
+  - `GET  /transcriptions` — lista jobs recentes (paginado, `?limit=20&offset=0`)
+- `sources/youtube.py` — yt-dlp substituindo pytube quebrado
+- Deletar código morto: `main.py`, `menu.py`, `utils.py`, `youtube_downloader.py`
+
+**Novas rotas em detalhe:**
+
+```
+POST /transcriptions/audio/batch
+  body: multipart com N arquivos
+  response: { "jobs": [{ "job_id": "...", "filename": "...", "status": "pending" }] }
+
+POST /transcriptions/video/batch
+  body: multipart com N vídeos
+  response: { "jobs": [...] }
+
+POST /transcriptions/video/extract
+  body: multipart (arquivo) ou JSON { "url": "..." }
+  response: { "job_id": "...", "status": "pending" }
+  # o resultado em /result retorna { "audio_path": "..." } ao invés de texto
+
+GET /transcriptions?limit=20&offset=0
+  response: { "items": [...], "total": N, "limit": 20, "offset": 0 }
 ```
 
 **TDD — testes a escrever primeiro:**
 ```
-tests/unit/
-└── test_cli_commands.py
-    # setup: Click CliRunner
-    ├── test_transcribe_audio_calls_service
-    ├── test_transcribe_video_calls_service
-    ├── test_transcribe_url_calls_service
-    ├── test_batch_calls_service_for_each_file
-    ├── test_job_status_prints_current_status
-    └── test_unsupported_format_shows_error_message
+tests/integration/
+└── test_api_batch.py
+    ├── test_audio_batch_returns_202_with_job_list
+    ├── test_audio_batch_creates_one_job_per_file
+    ├── test_video_batch_returns_202_with_job_list
+    ├── test_video_extract_returns_202
+    ├── test_list_jobs_returns_paginated_results
+    ├── test_list_jobs_respects_limit_param
+    └── test_youtube_url_dispatches_video_url_source
 ```
 
 **Critério de aceite da fase:**
-- [ ] `pytest tests/unit/test_cli_commands.py` passa com 0 falhas
-- [ ] `transcritor --help` mostra todos os comandos
-- [ ] `transcritor transcribe audio sample.wav` funciona end-to-end localmente
-- [ ] `main.py`, `menu.py`, `utils.py` deletados
+- [ ] `pytest tests/unit/ tests/integration/` passa com 0 falhas
+- [ ] `POST /transcriptions/audio/batch` com 3 arquivos retorna 3 job_ids
+- [ ] `POST /transcriptions/video/url` com link do YouTube cria job (yt-dlp)
+- [ ] `GET /transcriptions` retorna lista paginada
+- [ ] `main.py`, `menu.py`, `utils.py`, `youtube_downloader.py` deletados
+- [ ] Swagger em `/docs` mostra todas as rotas documentadas
 - [ ] Código revisado e push para `main`
 
 ---
 
-## Fase 8 — Limpeza e hardening
+## Fase 8 — Logging e hardening
 
-**Objetivo:** remover código morto, adicionar logging estruturado, garantir que recursos quebrados do app original estejam resolvidos ou explicitamente descontinuados.
+**Objetivo:** logging estruturado, tratamento de erros consistente e atualização da documentação.
 
 **O que será feito:**
-- Deletar `youtube_downloader.py` (substituído por `sources/youtube.py` com yt-dlp)
-- Implementar `sources/youtube.py` com yt-dlp — rota `POST /transcriptions/video/url` com links do YouTube passa a funcionar
-- Substituir todos os `print()` por `logging` estruturado (structlog ou stdlib logging)
-- Adicionar `GET /transcriptions` — lista jobs recentes (paginado)
-- Revisar todas as exceções — garantir que erros retornam mensagens úteis na API
-- Atualizar `CLAUDE.md` com a arquitetura final
+- Substituir todos os `print()` restantes por `logging` estruturado (stdlib logging com formato JSON em produção)
+- Garantir que todas as exceções retornam mensagens úteis na API (sem stack traces expostos)
+- Atualizar `CLAUDE.md` com a arquitetura final completa
+- Revisar `pyproject.toml` — remover deps não utilizados após deleção do código legado
 
 **Critério de aceite da fase:**
-- [ ] Nenhum `print()` fora do CLI
-- [ ] YouTube funciona: `POST /transcriptions/video/url` com link do YouTube
+- [ ] Nenhum `print()` no código de produção (`src/`)
+- [ ] Erros da API retornam JSON estruturado: `{ "detail": "mensagem clara" }`
 - [ ] `pytest` (todas as suites exceto e2e) passa sem falhas
-- [ ] `pytest tests/e2e/` passa com Docker rodando
-- [ ] `CLAUDE.md` atualizado
+- [ ] `pytest tests/e2e/ -m e2e` passa com Docker rodando
+- [ ] `CLAUDE.md` atualizado com arquitetura final
 - [ ] Código revisado e push para `main`
 
 ---
