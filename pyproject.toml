@@ -17,6 +17,7 @@ transcription = [
     "moviepy>=2.2.1",
     "sounddevice>=0.5.1",
     "wavio>=0.0.9",
+    "yt-dlp>=2025.1.15",
 ]
 api = [
     "fastapi>=0.135.0",

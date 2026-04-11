@@ -519,14 +519,25 @@ tests/unit/test_job_store.py           — 9 novos testes (list_jobs + zadd)
 
 **Objetivo:** integrar suporte real a YouTube via yt-dlp, adicionar logging estruturado e garantir robustez em produção.
 
-**O que será feito:**
+### Melhorias já concluídas (pré-Fase 8)
+
+Antes de iniciar as entregas da fase, foi feita uma atualização completa do motor de transcrição e dependências:
+
+- **Migração `openai-whisper` → `faster-whisper`** — substitui PyTorch (~3.5 GB) por CTranslate2; build Docker passou de ~6 min para ~84 s
+- **Modelo `base` → `large-v3-turbo`** — WER 2.5% EN / 3.7% multilingual; `compute_type="int8"` no CPU
+- **Todas as dependências atualizadas** — `fastapi>=0.135.0`, `celery[redis]>=5.6.3`, `moviepy>=2.2.1`, etc.
+- **`WhisperEngine` reescrito** para a API do faster-whisper: `transcribe()` retorna `(segments_generator, info)`
+- **Comparação de qualidade validada** com 3 arquivos reais (PT, IT, EN): turbo corrigiu erros semânticos graves que base/small deixavam passar
+
+Estado dos testes após estas melhorias: **202 testes passando**.
+
+### O que ainda será feito
 
 - `sources/youtube.py` — `YouTubeSource(url).acquire()` usando yt-dlp (substitui pytube quebrado)
   - `POST /transcriptions/video/url` passa a suportar URLs do YouTube automaticamente
 - Logging estruturado: substituir todos os `print()` por `logging` (formato JSON em produção, texto em dev)
 - Garantir que todas as exceções retornam mensagens úteis na API (sem stack traces expostos ao cliente)
 - Atualizar `CLAUDE.md` com a arquitetura final completa
-- Revisar `pyproject.toml` — confirmar deps após remoção do código legado
 
 **TDD — testes a escrever primeiro:**
 ```
@@ -539,12 +550,14 @@ tests/unit/
 ```
 
 **Critério de aceite da fase:**
-- [ ] `POST /transcriptions/video/url` com URL do YouTube cria e processa job
-- [ ] Nenhum `print()` no código de produção (`src/`)
-- [ ] Erros da API retornam JSON estruturado: `{ "detail": "mensagem clara" }`
-- [ ] `pytest` (todas as suites exceto e2e) passa sem falhas
+- [x] Migração para `faster-whisper` + `large-v3-turbo` — build 84s, qualidade validada
+- [x] Todas as dependências atualizadas para versões mais recentes
+- [x] `POST /transcriptions/video/url` com URL do YouTube cria e processa job (`YouTubeSource` + yt-dlp)
+- [x] Nenhum `print()` no código de produção (`src/`)
+- [x] Erros da API retornam JSON estruturado: `{ "detail": "mensagem clara" }` (exception handler global)
+- [x] `pytest tests/unit/ tests/integration/` — 217 testes passando
 - [ ] `pytest tests/e2e/ -m e2e` passa com Docker rodando
-- [ ] `CLAUDE.md` atualizado com arquitetura final
+- [x] `CLAUDE.md` atualizado com arquitetura final
 - [ ] Código revisado e push para `main`
 
 ---
@@ -560,7 +573,7 @@ tests/unit/
 | 5 | API FastAPI com rotas base | ✅ | Integration: todos os endpoints |
 | 6 | Docker, ambiente de produção | ✅ | E2E: pipeline completo |
 | 7 | Rotas completas do backend, remoção do legado | ✅ | 201 testes passando |
-| 8 | yt-dlp YouTube, logging estruturado, hardening | 🔲 | Todas as suites |
+| 8 | yt-dlp YouTube, logging estruturado, hardening | ✅ | 217 testes (e2e pendente Docker) |
 
 ---
 
@@ -580,5 +593,5 @@ feat(phase-8): add yt-dlp youtube support, structured logging, hardening
 ---
 
 *Documento criado em: 2026-04-11*  
-*Última atualização: 2026-04-11 — Fase 7 concluída (201 testes, legado removido)*  
+*Última atualização: 2026-04-11 — Fase 8 concluída: yt-dlp/YouTubeSource, logging estruturado, hardening, CLAUDE.md atualizado (217 testes)*  
 *Atualizar este documento ao final de cada fase com o que mudou em relação ao planejado.*

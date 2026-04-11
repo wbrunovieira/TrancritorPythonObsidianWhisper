@@ -4,69 +4,111 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Transcritor is a Python-based audio/video transcription tool using OpenAI's Whisper model. It provides a command-line menu interface for various transcription tasks including audio files, videos, system audio recording, and batch processing.
+Transcritor is a REST API service for async audio/video transcription using `faster-whisper` (`large-v3-turbo` model). It is a pure backend — no CLI, no frontend. Other apps on the same server consume it via HTTP.
+
+**Stack:** FastAPI + Celery + Redis + faster-whisper (CTranslate2, int8 on CPU) + Docker Compose.
 
 ## Development Commands
 
 ```bash
-# Activate virtual environment
+# Setup
 source venv/bin/activate
+pip install -e ".[transcription,api,dev]"
 
-# Install dependencies (openai-whisper is installed from git, not PyPI)
-pip install -r requirements.txt
+# Run tests
+python -m pytest tests/unit/ tests/integration/   # fast, no Docker needed
+python -m pytest tests/unit/ tests/integration/ -q --tb=short
+python -m pytest tests/unit/test_whisper_engine.py -v  # single file
+python -m pytest -m "not slow and not e2e"         # skip heavy tests
 
-# Run the application
-python main.py
+# Run locally (requires Redis)
+uvicorn transcritor.api.app:app --reload
+
+# Run with Docker (full stack)
+docker compose up --build
+docker compose logs -f worker    # watch worker logs
 ```
 
-### Key System Dependencies
-- **FFmpeg**: Required for audio/video processing (not in requirements.txt)
-- **BlackHole** (macOS): Required for system audio capture (option 5)
-- **Python 3.11+**
+**System dependencies:** FFmpeg (required by moviepy and yt-dlp), Python 3.11+.
 
 ## Architecture
 
-All source modules live at the project root (no `src/` directory):
-
-| File | Role |
-|------|------|
-| `main.py` | Entry point — menu loop and option dispatch |
-| `menu.py` | `display_menu()` — prints the numbered menu |
-| `utils.py` | `get_user_choice()` — validates user input |
-| `config.py` | Directory constants (`AUDIO_DIRECTORY`, `VIDEO_DIRECTORY`, `TRANSCRIPT_DIRECTORY`); auto-creates dirs on import |
-| `transcription.py` | `transcribe_audio()` (Whisper), `extract_audio_from_video()` (moviepy) |
-| `file_manager.py` | `save_transcription()`, `get_audio_files()`, `process_multiple_files()`, `process_video_file()` |
-| `system_audio.py` | `record_system_audio_until_stop()` — records via sounddevice, saves WAV |
-| `youtube_downloader.py` | `download_youtube_video()` — uses pytube (currently broken) |
-
-### Data Flow
 ```
-User selects menu option
-  → file/audio input
-  → extract_audio_from_video() if video (moviepy → WAV)
-  → transcribe_audio() (Whisper "base" model)
-  → save_transcription() → transcriptions/{name}.md
+src/transcritor/
+├── api/
+│   ├── app.py               # FastAPI app, lifespan, global exception handler
+│   ├── dependencies.py      # get_transcription_service()
+│   ├── schemas.py           # Request/response Pydantic models
+│   └── routers/
+│       ├── transcriptions.py  # all /transcriptions/* routes
+│       └── health.py          # /health, /ready
+├── core/
+│   ├── models.py            # JobStatus, TranscriptionJob, TranscriptionResult
+│   └── exceptions.py        # TranscriptionError, SourceUnavailableError, JobNotFoundError, JobNotReadyError
+├── config.py                # Settings (pydantic-settings); get_settings() cached singleton
+├── logging_config.py        # configure_logging() — call once at startup
+├── engine/
+│   ├── whisper_engine.py    # WhisperEngine: load() + transcribe() → TranscriptionResult
+│   └── registry.py          # get_engine() → process-level singleton
+├── sources/
+│   ├── base.py              # AudioSource Protocol: .acquire() → Path
+│   ├── file_source.py       # local uploaded file
+│   ├── url_source.py        # generic HTTP URL (Drive, S3, etc.)
+│   ├── video_source.py      # extract audio from video via moviepy
+│   ├── youtube_source.py    # YouTube URL via yt-dlp
+│   └── system_audio.py      # desktop audio capture (not used by API)
+├── storage/
+│   ├── file_store.py        # save/load TranscriptionResult as .json + .md
+│   └── job_store.py         # job status in Redis; sorted set for listing
+├── services/
+│   └── transcription_service.py  # submit_job(), get_job(), get_result(), list_jobs()
+└── workers/
+    ├── celery_app.py        # Celery instance; loads Whisper model on worker_process_init
+    └── tasks.py             # transcribe_task: _build_source() → run_transcription() or run_extraction()
 ```
 
-### Transcription Output Format
-Saved to `transcriptions/{original_name}.md`:
-```markdown
-# Course Transcription: {filename}
-**Transcription Date:** YYYY-MM-DD HH:MM:SS
+## API Routes
 
-{transcription text}
+```
+POST   /transcriptions/audio              # upload file
+POST   /transcriptions/audio/url          # via HTTP URL
+POST   /transcriptions/audio/batch        # multiple uploads
+POST   /transcriptions/video              # upload video file
+POST   /transcriptions/video/url          # HTTP URL or YouTube (auto-detected)
+POST   /transcriptions/video/batch        # multiple video uploads
+POST   /transcriptions/video/extract      # extract audio only, no transcription
+GET    /transcriptions                    # list jobs (paginated)
+GET    /transcriptions/{job_id}           # job status
+GET    /transcriptions/{job_id}/result    # result when done
+GET    /health                            # liveness
+GET    /ready                             # readiness (checks Redis + model)
 ```
 
-## Known Broken / Incomplete Features
+Swagger UI: `http://localhost:8000/docs`
 
-- **Option 6** (local environment audio): stub only — no implementation
-- **Option 7** (voice analysis): imports `voice_analysis.analyze_voice` which does not exist
-- **Option 10** (YouTube): `youtube_downloader.py` uses `pytube` which is blocked by YouTube
+## Key Design Decisions
 
-## Adding New Features
+- **`_build_source(source_type, source_kwargs)`** in `tasks.py` is the dispatch table for all input types. Add new source types here.
+- **`/video/url`** auto-detects YouTube URLs via `_is_youtube_url()` and routes to `YouTubeSource`, otherwise `UrlSource` + `VideoSource`.
+- **`get_engine()`** returns a process-level singleton — Whisper model is loaded once per worker process, not per job.
+- **`faster-whisper` API:** `model.transcribe()` returns `(segments_generator, info)`. The generator must be consumed to get text: `"".join(seg.text for seg in segments)`.
+- **`compute_type="int8"`** on CPU: ~4× faster than openai-whisper with minimal quality loss.
+- **Job persistence:** status in Redis (sorted set `jobs:all` for listing); result as `.json` + `.md` on disk.
 
-- New functionality belongs in its own module; wire it into `main.py`'s `if/elif` chain
-- New directories must be declared and `os.makedirs`'d in `config.py`
-- The Whisper model is loaded fresh on every call to `transcribe_audio()` — consider caching it for batch workflows
-- Audio files recognised by `get_audio_files()`: `.mp3`, `.wav`, `.mp4`, `.m4a`
-- Video files recognised inline in `main.py`: `.mp4`, `.mkv`, `.avi`, `.mov`
+## Testing Strategy
+
+- **Unit tests** (`tests/unit/`): no I/O, no Redis, no model — mock everything. Run in milliseconds.
+- **Integration tests** (`tests/integration/`): real FastAPI + real filesystem + `FakeRedis` + stubbed engine. `CELERY_TASK_ALWAYS_EAGER=True`.
+- **E2e tests** (`tests/e2e/`): full Docker stack required. Run with `-m e2e`.
+- `faster-whisper` mock: `model.transcribe()` must return `([mock_segment], mock_info)` where `mock_segment.text` is a string and `mock_info.language`/`mock_info.duration` are set.
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `WHISPER_MODEL` | `large-v3-turbo` | faster-whisper model name |
+| `REDIS_URL` | `redis://localhost:6379/0` | Redis connection URL |
+| `DATA_DIR` | `~/.transcritor` | Root for audio/, video/, transcripts/ |
+| `LOG_LEVEL` | `INFO` | Logging level |
+
+In Docker, `REDIS_URL` must use the service hostname: `redis://redis:6379/0`.

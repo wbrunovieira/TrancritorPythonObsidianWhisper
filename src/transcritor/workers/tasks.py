@@ -1,8 +1,11 @@
+import logging
 from pathlib import Path
 
 import redis
 
 from transcritor.core.models import JobStatus
+
+logger = logging.getLogger(__name__)
 from transcritor.engine.registry import get_engine
 from transcritor.engine.whisper_engine import WhisperEngine
 from transcritor.storage.file_store import FileStore
@@ -40,6 +43,12 @@ def _build_source(source_type: str, source_kwargs: dict):
         video_path = url_source.acquire()
         return VideoSource(video_path=video_path, output_dir=settings.audio_dir)
 
+    if source_type == "youtube":
+        from transcritor.sources.youtube_source import YouTubeSource
+        from transcritor.config import get_settings
+        settings = get_settings()
+        return YouTubeSource(url=source_kwargs["url"], download_dir=settings.audio_dir)
+
     if source_type == "extract":
         from transcritor.sources.video_source import VideoSource
         from transcritor.config import get_settings
@@ -62,12 +71,16 @@ def run_transcription(
     """Lógica pura de execução — sem Celery, testável diretamente."""
     from transcritor.core.models import TranscriptionResult
     job_store.update_status(job_id, JobStatus.PROCESSING)
+    logger.info("job=%s status=processing", job_id)
     try:
         audio_path = source.acquire()
+        logger.info("job=%s audio_ready path=%s", job_id, audio_path)
         result = engine.transcribe(audio_path)
         file_store.save_result(job_id, result)
         job_store.update_status(job_id, JobStatus.DONE)
+        logger.info("job=%s status=done language=%s duration=%.1fs", job_id, result.language, result.duration_seconds or 0)
     except Exception as e:
+        logger.error("job=%s status=failed error=%s", job_id, e)
         job_store.update_status(job_id, JobStatus.FAILED, error=str(e))
         raise
 
@@ -81,12 +94,15 @@ def run_extraction(
     """Extrai áudio de um vídeo sem transcrever — lógica pura, testável sem Celery."""
     from transcritor.core.models import TranscriptionResult
     job_store.update_status(job_id, JobStatus.PROCESSING)
+    logger.info("job=%s status=processing type=extract", job_id)
     try:
         audio_path = source.acquire()
         result = TranscriptionResult(audio_path=str(audio_path))
         file_store.save_result(job_id, result)
         job_store.update_status(job_id, JobStatus.DONE)
+        logger.info("job=%s status=done audio_path=%s", job_id, audio_path)
     except Exception as e:
+        logger.error("job=%s status=failed error=%s", job_id, e)
         job_store.update_status(job_id, JobStatus.FAILED, error=str(e))
         raise
 

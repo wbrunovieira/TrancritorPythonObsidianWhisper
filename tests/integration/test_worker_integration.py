@@ -43,10 +43,12 @@ def fake_engine():
     engine = WhisperEngine.__new__(WhisperEngine)
     engine._model_name = "base"
     mock_model = MagicMock()
-    mock_model.transcribe.return_value = {
-        "text": "integration test transcription",
-        "language": "en",
-    }
+    mock_segment = MagicMock()
+    mock_segment.text = "integration test transcription"
+    mock_info = MagicMock()
+    mock_info.language = "en"
+    mock_info.duration = 5.0
+    mock_model.transcribe.return_value = ([mock_segment], mock_info)
     engine._model = mock_model
     return engine
 

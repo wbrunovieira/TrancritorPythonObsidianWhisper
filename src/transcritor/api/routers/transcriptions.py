@@ -89,7 +89,9 @@ def transcribe_video_url(
     request: UrlTranscriptionRequest,
     service: TranscriptionService = Depends(get_transcription_service),
 ) -> JobCreatedResponse:
-    job = service.submit_job("video_url", {"url": request.url})
+    from transcritor.sources.youtube_source import _is_youtube_url
+    source_type = "youtube" if _is_youtube_url(request.url) else "video_url"
+    job = service.submit_job(source_type, {"url": request.url})
     return JobCreatedResponse(job_id=job.job_id, status=job.status)
 
 

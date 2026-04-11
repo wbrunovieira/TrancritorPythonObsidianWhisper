@@ -1,7 +1,13 @@
+import logging
+
 from celery import Celery
 from celery.signals import worker_process_init
 
 from transcritor.config import get_settings
+from transcritor.logging_config import configure_logging
+
+configure_logging()
+logger = logging.getLogger(__name__)
 
 settings = get_settings()
 
@@ -27,5 +33,7 @@ celery_app.conf.update(
 @worker_process_init.connect
 def init_worker(**kwargs):
     """Carrega o modelo Whisper uma única vez na inicialização do processo worker."""
+    logger.info("Worker process starting — loading Whisper model...")
     from transcritor.engine.registry import get_engine
     get_engine()
+    logger.info("Whisper model loaded and ready.")
