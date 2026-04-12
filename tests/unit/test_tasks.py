@@ -295,7 +295,7 @@ class TestCeleryTaskDispatch:
         with patch("transcritor.workers.tasks.run_transcription") as mock_run:
             with patch("transcritor.workers.tasks._build_source") as mock_source:
                 with patch("transcritor.workers.tasks.get_engine") as mock_engine:
-                    mock_source.return_value = _make_fake_source()
+                    mock_source.return_value = (_make_fake_source(), [])
                     mock_engine.return_value = _make_fake_engine()
 
                     from transcritor.workers.tasks import transcribe_task
@@ -304,3 +304,190 @@ class TestCeleryTaskDispatch:
             mock_run.assert_called_once()
 
         celery_app.conf.task_always_eager = False
+
+
+# ---------------------------------------------------------------------------
+# Testes de limpeza de arquivos temporários
+# ---------------------------------------------------------------------------
+
+class TestTranscriptionCleanup:
+    def test_audio_file_deleted_after_successful_transcription(self, tmp_path):
+        from transcritor.workers.tasks import run_transcription
+
+        audio_file = tmp_path / "audio.wav"
+        audio_file.write_bytes(b"fake audio")
+
+        job_store, file_store = MagicMock(), MagicMock()
+        source = MagicMock()
+        source.acquire.return_value = audio_file
+
+        run_transcription("job123", source, _make_fake_engine(), job_store, file_store)
+
+        assert not audio_file.exists()
+
+    def test_audio_file_not_deleted_when_transcription_fails(self, tmp_path):
+        from transcritor.workers.tasks import run_transcription
+
+        audio_file = tmp_path / "audio.wav"
+        audio_file.write_bytes(b"fake audio")
+
+        job_store, file_store = MagicMock(), MagicMock()
+        source = MagicMock()
+        source.acquire.return_value = audio_file
+        engine = MagicMock()
+        engine.transcribe.side_effect = RuntimeError("model crashed")
+
+        with pytest.raises(RuntimeError):
+            run_transcription("job123", source, engine, job_store, file_store)
+
+        assert audio_file.exists()
+
+    def test_extra_cleanup_paths_deleted_after_transcription(self, tmp_path):
+        from transcritor.workers.tasks import run_transcription
+
+        audio_file = tmp_path / "audio.wav"
+        video_file = tmp_path / "video.mp4"
+        audio_file.write_bytes(b"fake audio")
+        video_file.write_bytes(b"fake video")
+
+        job_store, file_store = MagicMock(), MagicMock()
+        source = MagicMock()
+        source.acquire.return_value = audio_file
+
+        run_transcription("job123", source, _make_fake_engine(), job_store, file_store,
+                          cleanup_paths=[video_file])
+
+        assert not video_file.exists()
+
+    def test_extra_cleanup_paths_not_deleted_on_failure(self, tmp_path):
+        from transcritor.workers.tasks import run_transcription
+
+        audio_file = tmp_path / "audio.wav"
+        video_file = tmp_path / "video.mp4"
+        audio_file.write_bytes(b"fake audio")
+        video_file.write_bytes(b"fake video")
+
+        job_store, file_store = MagicMock(), MagicMock()
+        source = MagicMock()
+        source.acquire.return_value = audio_file
+        engine = MagicMock()
+        engine.transcribe.side_effect = RuntimeError("boom")
+
+        with pytest.raises(RuntimeError):
+            run_transcription("job123", source, engine, job_store, file_store,
+                              cleanup_paths=[video_file])
+
+        assert video_file.exists()
+
+    def test_cleanup_does_not_raise_if_audio_file_missing(self, tmp_path):
+        from transcritor.workers.tasks import run_transcription
+
+        audio_file = tmp_path / "audio.wav"
+        # arquivo não existe — não deve lançar exceção
+
+        job_store, file_store = MagicMock(), MagicMock()
+        source = MagicMock()
+        source.acquire.return_value = audio_file
+
+        run_transcription("job123", source, _make_fake_engine(), job_store, file_store)
+
+    def test_extraction_keeps_audio_file(self, tmp_path):
+        from transcritor.workers.tasks import run_extraction
+
+        audio_file = tmp_path / "extracted.wav"
+        audio_file.write_bytes(b"fake audio")
+
+        job_store, file_store = MagicMock(), MagicMock()
+        source = MagicMock()
+        source.acquire.return_value = audio_file
+
+        run_extraction("job123", source, job_store, file_store)
+
+        assert audio_file.exists()
+
+
+# ---------------------------------------------------------------------------
+# Testes de _build_source: retorno de cleanup_paths
+# ---------------------------------------------------------------------------
+
+class TestBuildSourceCleanupPaths:
+    def test_file_source_returns_empty_cleanup(self):
+        from transcritor.workers.tasks import _build_source
+
+        with patch("transcritor.sources.file_source.FileSource") as mock_fs:
+            mock_fs.return_value = MagicMock()
+            _, cleanup = _build_source("file", {"path": "/tmp/audio.wav"})
+
+        assert cleanup == []
+
+    def test_url_source_returns_empty_cleanup(self):
+        from transcritor.workers.tasks import _build_source
+
+        mock_settings = MagicMock()
+        mock_settings.audio_dir = "/tmp/audio"
+
+        with patch("transcritor.config.get_settings", return_value=mock_settings):
+            with patch("transcritor.sources.url_source.UrlSource") as mock_us:
+                mock_us.return_value = MagicMock()
+                _, cleanup = _build_source("url", {"url": "https://example.com/a.mp3"})
+
+        assert cleanup == []
+
+    def test_youtube_source_returns_empty_cleanup(self):
+        from transcritor.workers.tasks import _build_source
+
+        mock_settings = MagicMock()
+        mock_settings.audio_dir = "/tmp/audio"
+
+        with patch("transcritor.config.get_settings", return_value=mock_settings):
+            with patch("transcritor.sources.youtube_source.YouTubeSource") as mock_yt:
+                mock_yt.return_value = MagicMock()
+                _, cleanup = _build_source("youtube", {"url": "https://youtube.com/watch?v=x"})
+
+        assert cleanup == []
+
+    def test_video_source_cleanup_includes_original_video(self, tmp_path):
+        from pathlib import Path
+        from transcritor.workers.tasks import _build_source
+
+        video_file = tmp_path / "video.mp4"
+        mock_settings = MagicMock()
+        mock_settings.audio_dir = tmp_path
+
+        with patch("transcritor.config.get_settings", return_value=mock_settings):
+            with patch("transcritor.sources.video_source.VideoSource") as mock_vs:
+                mock_vs.return_value = MagicMock()
+                _, cleanup = _build_source("video", {"path": str(video_file)})
+
+        assert Path(str(video_file)) in [Path(str(p)) for p in cleanup]
+
+    def test_video_url_source_cleanup_includes_downloaded_video(self, tmp_path):
+        from pathlib import Path
+        from transcritor.workers.tasks import _build_source
+
+        fake_video = tmp_path / "downloaded.mp4"
+        mock_settings = MagicMock()
+        mock_settings.video_dir = tmp_path
+        mock_settings.audio_dir = tmp_path
+
+        with patch("transcritor.config.get_settings", return_value=mock_settings):
+            with patch("transcritor.sources.url_source.UrlSource") as mock_us:
+                mock_us.return_value.acquire.return_value = fake_video
+                with patch("transcritor.sources.video_source.VideoSource") as mock_vs:
+                    mock_vs.return_value = MagicMock()
+                    _, cleanup = _build_source("video_url", {"url": "https://example.com/v.mp4"})
+
+        assert fake_video in cleanup
+
+    def test_extract_source_returns_empty_cleanup(self):
+        from transcritor.workers.tasks import _build_source
+
+        mock_settings = MagicMock()
+        mock_settings.audio_dir = "/tmp/audio"
+
+        with patch("transcritor.config.get_settings", return_value=mock_settings):
+            with patch("transcritor.sources.video_source.VideoSource") as mock_vs:
+                mock_vs.return_value = MagicMock()
+                _, cleanup = _build_source("extract", {"path": "/tmp/video.mp4"})
+
+        assert cleanup == []

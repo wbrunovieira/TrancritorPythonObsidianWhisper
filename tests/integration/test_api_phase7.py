@@ -87,12 +87,17 @@ async def client(fake_service, tmp_path):
         data_dir=tmp_path,
         redis_url="redis://localhost:6379/0",
         whisper_model="base",
+        api_key="test-secret",
     )
     app.dependency_overrides[get_transcription_service] = lambda: fake_service
     app.dependency_overrides[get_settings] = lambda: test_settings
     get_settings.cache_clear()
 
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+        headers={"X-API-Key": "test-secret"},
+    ) as c:
         yield c
 
     app.dependency_overrides.clear()
