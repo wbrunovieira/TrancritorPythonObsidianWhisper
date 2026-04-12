@@ -574,6 +574,97 @@ tests/unit/
 | 6 | Docker, ambiente de produção | ✅ | E2E: pipeline completo |
 | 7 | Rotas completas do backend, remoção do legado | ✅ | 201 testes passando |
 | 8 | yt-dlp YouTube, logging estruturado, hardening | ✅ | 217 unit+integration + 11 e2e (228 total) |
+| 9 | Limpeza de arquivos temporários pós-transcrição | ✅ | 236 testes passando |
+| 10 | Diarização com identificação de locutores por nome | 🔜 | — |
+
+---
+
+---
+
+## Fase 10 — Diarização com identificação de locutores por nome
+
+**Objetivo:** Identificar quem fala em cada trecho do áudio e, quando possível, nomear os locutores a partir das apresentações no início da ligação.
+
+**Motivação:** Telefonemas e reuniões geralmente começam com apresentações ("aqui é a Maria", "fala com o João"). Usando diarização + LLM é possível mapear automaticamente os labels técnicos (`SPEAKER_00`, `SPEAKER_01`) para nomes reais.
+
+### Pipeline
+
+```
+áudio
+  │
+  ├─► pyannote.audio ──► segmentos por speaker (SPEAKER_00, SPEAKER_01...)
+  │                        com timestamps
+  │
+  ├─► faster-whisper ──► texto com timestamps por segmento
+  │
+  ├─► alinhamento ──────► cada trecho de texto recebe um speaker label
+  │
+  └─► Claude API ───────► analisa os primeiros ~90s da transcrição
+                           extrai mapeamento: SPEAKER_00 → "Maria", SPEAKER_01 → "João"
+                           fallback: mantém label genérico se não identificar
+```
+
+### Mudanças na API
+
+Nova query param opcional em todas as rotas de áudio:
+
+```
+POST /transcriptions/audio?diarize=true
+POST /transcriptions/audio/url?diarize=true
+POST /transcriptions/audio/batch?diarize=true
+```
+
+### Formato do resultado com diarização
+
+```json
+{
+  "job_id": "abc123",
+  "text": "Transcrição completa sem separação de locutores...",
+  "language": "pt",
+  "duration_seconds": 183.4,
+  "speakers": {
+    "SPEAKER_00": "Maria",
+    "SPEAKER_01": "João"
+  },
+  "segments": [
+    {"speaker": "Maria", "start": 0.0,  "end": 4.2,  "text": "Alô, bom dia, aqui é a Maria do suporte."},
+    {"speaker": "João",  "start": 5.1,  "end": 8.0,  "text": "Bom dia Maria, aqui é o João."},
+    {"speaker": "Maria", "start": 9.0,  "end": 12.3, "text": "Pode me dizer seu CPF?"}
+  ]
+}
+```
+
+### Dependências novas
+
+| Lib | Função |
+|-----|--------|
+| `pyannote.audio` | Diarização — requer token Hugging Face (modelo com licença) |
+| `anthropic` | Extração de nomes via Claude API |
+
+### Considerações de infraestrutura
+
+- `pyannote` consome ~2–3 GB de RAM adicionais além do Whisper
+- Verificar RAM disponível no servidor antes de implementar
+- Token do Hugging Face necessário para `pyannote/speaker-diarization-3.1`
+- Diarização aumenta o tempo de processamento (~1,5× mais lento)
+- Jobs com `diarize=true` podem precisar de timeout maior no nginx (`proxy_read_timeout`)
+
+### Decisões pendentes antes de implementar
+
+- [ ] Confirmar RAM disponível no servidor
+- [ ] Criar token Hugging Face e aceitar licença do modelo `pyannote/speaker-diarization-3.1`
+- [ ] Definir qual modelo Claude usar para extração de nomes (custo por job)
+- [ ] Definir comportamento quando não há apresentação no início (fallback)
+- [ ] Decidir se `segments` entra no `TranscriptionResult` existente ou em modelo separado
+
+### Critérios de aceite (fase futura)
+
+- [ ] `POST /transcriptions/audio?diarize=true` retorna `segments` com speaker por trecho
+- [ ] Nomes extraídos corretamente do início de telefonemas reais
+- [ ] Fallback para `SPEAKER_00`, `SPEAKER_01` quando nomes não identificados
+- [ ] `diarize=false` (default) — comportamento atual inalterado, zero overhead
+- [ ] Testes unitários com pyannote mockado
+- [ ] Testes de integração com áudio de fixture com 2 locutores
 
 ---
 
@@ -588,10 +679,12 @@ feat(phase-5): add fastapi with transcription routes
 feat(phase-6): add docker compose for production deployment
 feat(phase-7): add batch, extract, list-jobs routes; remove legacy CLI files
 feat(phase-8): add yt-dlp youtube support, structured logging, hardening
+feat(phase-9): delete temp audio/video files after successful transcription
+feat(phase-10): add speaker diarization with name identification via pyannote + Claude
 ```
 
 ---
 
 *Documento criado em: 2026-04-11*  
-*Última atualização: 2026-04-11 — Fase 8 concluída: yt-dlp/YouTubeSource, logging estruturado, hardening, CLAUDE.md atualizado (228 testes — 217 unit+integration + 11 e2e)*  
+*Última atualização: 2026-04-12 — Fase 9 concluída: limpeza de arquivos temporários pós-transcrição (236 testes). Fase 10 planejada: diarização com identificação de locutores por nome.*  
 *Atualizar este documento ao final de cada fase com o que mudou em relação ao planejado.*
