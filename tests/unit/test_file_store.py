@@ -2,7 +2,7 @@ import json
 import pytest
 
 from transcritor.storage.file_store import FileStore
-from transcritor.core.models import TranscriptionResult
+from transcritor.core.models import TranscriptionResult, TranscriptionSegment
 from transcritor.core.exceptions import TranscriptionError
 
 
@@ -90,3 +90,39 @@ class TestFileStoreLoad:
         store.save_result("job123", result)
         loaded = store.load_result("job123")
         assert loaded.model_dump() == result.model_dump()
+
+    def test_load_preserves_segments(self, store):
+        result = TranscriptionResult(
+            text="Diga. Beleza.",
+            segments=[
+                TranscriptionSegment(start=0.0, end=1.2, text="Diga."),
+                TranscriptionSegment(start=1.8, end=4.5, text="Beleza."),
+            ],
+        )
+        store.save_result("job-seg", result)
+        loaded = store.load_result("job-seg")
+        assert len(loaded.segments) == 2
+        assert loaded.segments[0].start == 0.0
+        assert loaded.segments[0].end == 1.2
+        assert loaded.segments[0].text == "Diga."
+        assert loaded.segments[1].text == "Beleza."
+
+    def test_json_contains_segments_array(self, store):
+        result = TranscriptionResult(
+            text="test",
+            segments=[TranscriptionSegment(start=0.0, end=1.0, text="test")],
+        )
+        store.save_result("job-seg2", result)
+        import json
+        data = json.loads((store._dir / "job-seg2.json").read_text())
+        assert "segments" in data
+        assert isinstance(data["segments"], list)
+
+    def test_load_result_without_segments_returns_empty_list(self, store):
+        """Compatibilidade com results antigos sem campo segments no JSON."""
+        import json
+        old_json = json.dumps({"text": "olá", "language": "pt",
+                               "duration_seconds": 5.0, "audio_path": None})
+        (store._dir / "old-job.json").write_text(old_json, encoding="utf-8")
+        loaded = store.load_result("old-job")
+        assert loaded.segments == []

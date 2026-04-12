@@ -217,4 +217,5 @@ def get_job_result(
         language=result.language,
         duration_seconds=result.duration_seconds,
         audio_path=result.audio_path,
+        segments=result.segments,
     )

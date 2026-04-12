@@ -1,6 +1,6 @@
 import pytest
 from datetime import datetime
-from transcritor.core.models import JobStatus, TranscriptionJob, TranscriptionResult
+from transcritor.core.models import JobStatus, TranscriptionJob, TranscriptionResult, TranscriptionSegment
 
 
 class TestJobStatus:
@@ -101,3 +101,50 @@ class TestTranscriptionResult:
     def test_empty_text_is_valid(self):
         result = TranscriptionResult(text="")
         assert result.text == ""
+
+    def test_segments_defaults_to_empty_list(self):
+        result = TranscriptionResult(text="test")
+        assert result.segments == []
+
+    def test_segments_are_included_in_serialization(self):
+        result = TranscriptionResult(
+            text="Diga. Beleza.",
+            segments=[
+                TranscriptionSegment(start=0.0, end=1.2, text="Diga."),
+                TranscriptionSegment(start=1.8, end=4.5, text="Beleza."),
+            ],
+        )
+        data = result.model_dump()
+        assert len(data["segments"]) == 2
+        assert data["segments"][0]["start"] == 0.0
+        assert data["segments"][0]["end"] == 1.2
+        assert data["segments"][0]["text"] == "Diga."
+
+    def test_json_round_trip_with_segments(self):
+        result = TranscriptionResult(
+            text="Diga.",
+            segments=[TranscriptionSegment(start=0.0, end=1.2, text="Diga.")],
+        )
+        restored = TranscriptionResult.model_validate_json(result.model_dump_json())
+        assert len(restored.segments) == 1
+        assert restored.segments[0].start == 0.0
+        assert restored.segments[0].end == 1.2
+        assert restored.segments[0].text == "Diga."
+
+
+class TestTranscriptionSegment:
+    def test_has_start_end_text(self):
+        seg = TranscriptionSegment(start=1.0, end=2.5, text="Olá.")
+        assert seg.start == 1.0
+        assert seg.end == 2.5
+        assert seg.text == "Olá."
+
+    def test_serialization(self):
+        seg = TranscriptionSegment(start=0.0, end=1.2, text="Diga.")
+        data = seg.model_dump()
+        assert data == {"start": 0.0, "end": 1.2, "text": "Diga."}
+
+    def test_start_and_end_are_float(self):
+        seg = TranscriptionSegment(start=0, end=1, text="x")
+        assert isinstance(seg.start, float)
+        assert isinstance(seg.end, float)

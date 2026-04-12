@@ -20,8 +20,15 @@ class TranscriptionJob(BaseModel):
     error: str | None = None
 
 
+class TranscriptionSegment(BaseModel):
+    start: float
+    end: float
+    text: str
+
+
 class TranscriptionResult(BaseModel):
     text: str = ""
     language: str | None = None
     duration_seconds: float | None = None
     audio_path: str | None = None
+    segments: list[TranscriptionSegment] = []

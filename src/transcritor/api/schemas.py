@@ -2,7 +2,7 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
-from transcritor.core.models import JobStatus
+from transcritor.core.models import JobStatus, TranscriptionSegment
 
 
 class UrlTranscriptionRequest(BaseModel):
@@ -28,6 +28,7 @@ class TranscriptionResultResponse(BaseModel):
     language: str | None = None
     duration_seconds: float | None = None
     audio_path: str | None = None
+    segments: list[TranscriptionSegment] = []
 
 
 class BatchJobsResponse(BaseModel):

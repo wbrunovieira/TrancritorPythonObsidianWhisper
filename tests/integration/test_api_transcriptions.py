@@ -9,7 +9,7 @@ import pytest
 from datetime import datetime
 from httpx import AsyncClient, ASGITransport
 
-from transcritor.core.models import TranscriptionJob, TranscriptionResult, JobStatus
+from transcritor.core.models import TranscriptionJob, TranscriptionResult, TranscriptionSegment, JobStatus
 from transcritor.core.exceptions import JobNotFoundError, JobNotReadyError
 
 
@@ -359,6 +359,54 @@ class TestGetResult:
         fake_service.preset_result("done-job", TranscriptionResult(text="test"))
         r = await client.get("/transcriptions/done-job/result")
         assert r.json()["job_id"] == "done-job"
+
+    async def test_response_includes_segments_field(self, client, fake_service):
+        job = TranscriptionJob(
+            job_id="done-job",
+            status=JobStatus.DONE,
+            source_type="file",
+            created_at=datetime.now(),
+        )
+        fake_service.preset_job(job)
+        fake_service.preset_result("done-job", TranscriptionResult(text="Diga."))
+        r = await client.get("/transcriptions/done-job/result")
+        assert "segments" in r.json()
+
+    async def test_response_segments_contains_timestamps(self, client, fake_service):
+        job = TranscriptionJob(
+            job_id="seg-job",
+            status=JobStatus.DONE,
+            source_type="file",
+            created_at=datetime.now(),
+        )
+        fake_service.preset_job(job)
+        fake_service.preset_result(
+            "seg-job",
+            TranscriptionResult(
+                text="Diga. Beleza.",
+                segments=[
+                    TranscriptionSegment(start=0.0, end=1.2, text="Diga."),
+                    TranscriptionSegment(start=1.8, end=4.5, text="Beleza."),
+                ],
+            ),
+        )
+        r = await client.get("/transcriptions/seg-job/result")
+        segs = r.json()["segments"]
+        assert len(segs) == 2
+        assert segs[0] == {"start": 0.0, "end": 1.2, "text": "Diga."}
+        assert segs[1] == {"start": 1.8, "end": 4.5, "text": "Beleza."}
+
+    async def test_response_segments_empty_list_when_none(self, client, fake_service):
+        job = TranscriptionJob(
+            job_id="empty-seg-job",
+            status=JobStatus.DONE,
+            source_type="file",
+            created_at=datetime.now(),
+        )
+        fake_service.preset_job(job)
+        fake_service.preset_result("empty-seg-job", TranscriptionResult(text="test"))
+        r = await client.get("/transcriptions/empty-seg-job/result")
+        assert r.json()["segments"] == []
 
 
 # ---------------------------------------------------------------------------

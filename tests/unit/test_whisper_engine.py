@@ -6,17 +6,22 @@ from transcritor.engine.whisper_engine import WhisperEngine
 from transcritor.core.models import TranscriptionResult
 
 
+def _make_mock_segment(text=" olá mundo", start=0.0, end=2.5):
+    seg = MagicMock()
+    seg.text = text
+    seg.start = start
+    seg.end = end
+    return seg
+
+
 def _make_mock_model(text=" olá mundo", language="pt", duration=10.5):
     """Retorna mock que imita a API do faster-whisper."""
-    mock_segment = MagicMock()
-    mock_segment.text = text
-
     mock_info = MagicMock()
     mock_info.language = language
     mock_info.duration = duration
 
     mock_model = MagicMock()
-    mock_model.transcribe.return_value = ([mock_segment], mock_info)
+    mock_model.transcribe.return_value = ([_make_mock_segment(text)], mock_info)
     return mock_model
 
 
@@ -46,10 +51,8 @@ class TestWhisperEngine:
         """faster-whisper retorna segmentos — todos devem ser concatenados."""
         engine = WhisperEngine("small")
 
-        seg1 = MagicMock()
-        seg1.text = " Primeiro segmento."
-        seg2 = MagicMock()
-        seg2.text = " Segundo segmento."
+        seg1 = _make_mock_segment(" Primeiro segmento.", start=0.0, end=5.0)
+        seg2 = _make_mock_segment(" Segundo segmento.", start=5.5, end=10.0)
         mock_info = MagicMock()
         mock_info.language = "pt"
         mock_info.duration = 20.0
@@ -61,6 +64,42 @@ class TestWhisperEngine:
         result = engine.transcribe(Path("audio.wav"))
 
         assert result.text == " Primeiro segmento. Segundo segmento."
+
+    def test_transcribe_captures_segment_timestamps(self):
+        engine = WhisperEngine("small")
+
+        seg1 = _make_mock_segment("Diga.", start=0.0, end=1.2)
+        seg2 = _make_mock_segment("Beleza meu caro.", start=1.8, end=4.5)
+        mock_info = MagicMock()
+        mock_info.language = "pt"
+        mock_info.duration = 10.0
+
+        mock_model = MagicMock()
+        mock_model.transcribe.return_value = ([seg1, seg2], mock_info)
+        engine._model = mock_model
+
+        result = engine.transcribe(Path("audio.wav"))
+
+        assert len(result.segments) == 2
+        assert result.segments[0].start == 0.0
+        assert result.segments[0].end == 1.2
+        assert result.segments[0].text == "Diga."
+        assert result.segments[1].start == 1.8
+        assert result.segments[1].end == 4.5
+        assert result.segments[1].text == "Beleza meu caro."
+
+    def test_transcribe_segments_empty_when_no_segments(self):
+        engine = WhisperEngine("small")
+        mock_info = MagicMock()
+        mock_info.language = "pt"
+        mock_info.duration = 0.0
+        mock_model = MagicMock()
+        mock_model.transcribe.return_value = ([], mock_info)
+        engine._model = mock_model
+
+        result = engine.transcribe(Path("audio.wav"))
+
+        assert result.segments == []
 
     def test_transcribe_maps_language_correctly(self):
         engine = WhisperEngine("small")

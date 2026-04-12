@@ -5,7 +5,7 @@ try:
 except ImportError:
     FasterWhisperModel = None  # type: ignore[assignment,misc]
 
-from transcritor.core.models import TranscriptionResult
+from transcritor.core.models import TranscriptionResult, TranscriptionSegment
 
 
 class WhisperEngine:
@@ -30,10 +30,16 @@ class WhisperEngine:
             raise RuntimeError(
                 "Engine not loaded. Call load() before transcribe()."
             )
-        segments, info = self._model.transcribe(str(audio_path), beam_size=5)
-        text = "".join(segment.text for segment in segments)
+        raw_segments, info = self._model.transcribe(str(audio_path), beam_size=5)
+        collected = list(raw_segments)
+        text = "".join(seg.text for seg in collected)
+        segments = [
+            TranscriptionSegment(start=seg.start, end=seg.end, text=seg.text)
+            for seg in collected
+        ]
         return TranscriptionResult(
             text=text,
             language=info.language,
             duration_seconds=info.duration,
+            segments=segments,
         )
