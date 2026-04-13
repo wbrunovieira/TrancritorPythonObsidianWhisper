@@ -1,0 +1,14 @@
+# Copie para vault.yml e criptografe:
+#   ansible-vault encrypt group_vars/vault.yml
+#
+# Para editar depois:
+#   ansible-vault edit group_vars/vault.yml
+#
+# Para rodar o playbook com vault:
+#   ansible-playbook playbooks/deploy.yml --vault-password-file .vault_pass
+#   ou: ansible-playbook playbooks/deploy.yml --ask-vault-pass
+#
+# Gerar uma API key forte:
+#   python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+
+vault_api_key: "CHANGE_ME_USE_STRONG_KEY"

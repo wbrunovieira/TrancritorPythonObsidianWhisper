@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 import redis
@@ -114,6 +115,49 @@ def run_extraction(
         logger.error("job=%s status=failed error=%s", job_id, e)
         job_store.update_status(job_id, JobStatus.FAILED, error=str(e))
         raise
+
+
+def run_cleanup(job_store: JobStore, file_store: FileStore, ttl_hours: int) -> int:
+    """Deleta jobs (done/failed) cujo completed_at é mais antigo que ttl_hours. Retorna o total deletado."""
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=ttl_hours)
+    deleted = 0
+
+    for job_id in job_store.list_all_ids():
+        try:
+            job = job_store.load(job_id)
+        except Exception:
+            continue
+
+        if job.status not in (JobStatus.DONE, JobStatus.FAILED):
+            continue
+
+        if job.completed_at is None:
+            continue
+
+        completed_at = job.completed_at
+        if completed_at.tzinfo is None:
+            completed_at = completed_at.replace(tzinfo=timezone.utc)
+
+        if completed_at < cutoff:
+            file_store.delete_result(job_id)
+            job_store.delete(job_id)
+            deleted += 1
+            logger.info("job=%s deleted reason=ttl_expired ttl_hours=%d", job_id, ttl_hours)
+
+    logger.info("cleanup done deleted=%d ttl_hours=%d", deleted, ttl_hours)
+    return deleted
+
+
+@celery_app.task(name="transcritor.workers.tasks.cleanup_task")
+def cleanup_task() -> None:
+    """Celery Beat task — monta dependências e delega para run_cleanup."""
+    from transcritor.config import get_settings
+
+    settings = get_settings()
+    redis_client = redis.from_url(settings.redis_url)
+    job_store = JobStore(redis_client)
+    file_store = FileStore(settings.transcripts_dir)
+    run_cleanup(job_store, file_store, ttl_hours=settings.result_ttl_hours)
 
 
 @celery_app.task(name="transcritor.workers.tasks.transcribe_task", bind=True, max_retries=3)

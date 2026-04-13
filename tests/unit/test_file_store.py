@@ -118,6 +118,29 @@ class TestFileStoreLoad:
         assert "segments" in data
         assert isinstance(data["segments"], list)
 
+class TestFileStoreDelete:
+    def test_delete_removes_json_file(self, store, tmp_path, result):
+        store.save_result("job123", result)
+        store.delete_result("job123")
+        assert not (tmp_path / "job123.json").exists()
+
+    def test_delete_removes_md_file(self, store, tmp_path, result):
+        store.save_result("job123", result)
+        store.delete_result("job123")
+        assert not (tmp_path / "job123.md").exists()
+
+    def test_delete_does_not_raise_if_json_missing(self, store):
+        store.delete_result("nonexistent")  # deve passar silenciosamente
+
+    def test_delete_does_not_raise_if_md_missing(self, store, tmp_path, result):
+        store.save_result("job123", result)
+        (tmp_path / "job123.md").unlink()
+        store.delete_result("job123")  # deve passar silenciosamente
+
+    def test_delete_does_not_raise_if_both_files_missing(self, store):
+        store.delete_result("ghost-job")  # deve passar silenciosamente
+
+
     def test_load_result_without_segments_returns_empty_list(self, store):
         """Compatibilidade com results antigos sem campo segments no JSON."""
         import json

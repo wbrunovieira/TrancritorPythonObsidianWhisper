@@ -26,6 +26,14 @@ class JobStore:
         jobs = [self.load(jid.decode() if isinstance(jid, bytes) else jid) for jid in job_ids]
         return {"jobs": jobs, "page": page, "page_size": page_size, "total": total}
 
+    def delete(self, job_id: str) -> None:
+        self._redis.delete(f"job:{job_id}")
+        self._redis.zrem("jobs:all", job_id)
+
+    def list_all_ids(self) -> list[str]:
+        ids = self._redis.zrange("jobs:all", 0, -1)
+        return [jid.decode() if isinstance(jid, bytes) else jid for jid in ids]
+
     def update_status(
         self, job_id: str, status: JobStatus, error: str | None = None
     ) -> None:

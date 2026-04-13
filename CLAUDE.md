@@ -44,7 +44,7 @@ src/transcritor/
 │       └── health.py          # /health, /ready
 ├── core/
 │   ├── models.py            # JobStatus, TranscriptionJob, TranscriptionResult
-│   └── exceptions.py        # TranscriptionError, SourceUnavailableError, JobNotFoundError, JobNotReadyError
+│   └── exceptions.py        # TranscriptionError, UnsupportedFormatError, SourceUnavailableError, JobNotFoundError, JobNotReadyError
 ├── config.py                # Settings (pydantic-settings); get_settings() cached singleton
 ├── logging_config.py        # configure_logging() — call once at startup
 ├── engine/
@@ -88,14 +88,15 @@ Swagger UI: `http://localhost:8000/docs`
 
 ## Key Design Decisions
 
-- **`_build_source(source_type, source_kwargs)`** in `tasks.py` is the dispatch table for all input types. Add new source types here.
+- **`_build_source(source_type, source_kwargs)`** in `tasks.py` is the dispatch table for all input types; returns `(source, cleanup_paths)`. Add new source types here. After successful transcription, `run_transcription()` deletes the audio file and any `cleanup_paths` (e.g. source video for `video` and `video_url` jobs).
+- **`run_transcription()` / `run_extraction()`** in `tasks.py` are pure functions (no Celery dependency) — test them directly without a Celery worker.
 - **`/video/url`** auto-detects YouTube URLs via `_is_youtube_url()` and routes to `YouTubeSource`, otherwise `UrlSource` + `VideoSource`.
 - **`get_engine()`** returns a process-level singleton — Whisper model is loaded once per worker process, not per job.
 - **`faster-whisper` API:** `model.transcribe()` returns `(segments_generator, info)`. Collect with `list()` before iterating — the generator is consumed once. Each segment has `.text`, `.start`, `.end`.
 - **`TranscriptionResult.segments`** is always populated by the engine: `[TranscriptionSegment(start, end, text), ...]`. Stored in the `.json` result file. Old results without segments deserialize to `[]`.
-- **`_build_source(source_type, source_kwargs)`** returns `(source, cleanup_paths)`. After successful transcription, `run_transcription()` deletes the audio file and any paths in `cleanup_paths` (e.g. source video for `video` and `video_url` jobs).
 - **`compute_type="int8"`** on CPU: ~4× faster than openai-whisper with minimal quality loss.
 - **Job persistence:** status in Redis (sorted set `jobs:all` for listing); result as `.json` + `.md` on disk. Audio/video files are deleted after transcription — only the transcript is kept.
+- **TTL cleanup:** `run_cleanup(job_store, file_store, ttl_hours)` in `tasks.py` — pure function, deletes expired `done`/`failed` jobs (files + Redis). Called daily at 03:00 UTC by Celery Beat (`beat` service in docker-compose). Configured via `RESULT_TTL_HOURS` env var (default: 24).
 
 ## Testing Strategy
 
@@ -103,6 +104,7 @@ Swagger UI: `http://localhost:8000/docs`
 - **Integration tests** (`tests/integration/`): real FastAPI + real filesystem + `FakeRedis` + stubbed engine. `CELERY_TASK_ALWAYS_EAGER=True`.
 - **E2e tests** (`tests/e2e/`): full Docker stack required. Run with `-m e2e`.
 - `faster-whisper` mock: `model.transcribe()` must return `([mock_segment], mock_info)` where `mock_segment.text`, `.start`, `.end` are set and `mock_info.language`/`mock_info.duration` are set.
+- **`conftest.py` fixtures:** `reset_engine` resets the `WhisperEngine` singleton between tests; `reset_settings` clears the `get_settings()` `lru_cache`. Use these when a test mutates global state.
 
 ## Environment Variables
 
@@ -112,5 +114,6 @@ Swagger UI: `http://localhost:8000/docs`
 | `REDIS_URL` | `redis://localhost:6379/0` | Redis connection URL |
 | `DATA_DIR` | `~/.transcritor` | Root for audio/, video/, transcripts/ |
 | `LOG_LEVEL` | `INFO` | Logging level |
+| `RESULT_TTL_HOURS` | `24` | Hours to keep transcript results before cleanup |
 
 In Docker, `REDIS_URL` must use the service hostname: `redis://redis:6379/0`.

@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     log_level: str = "INFO"
     api_key: str = ""
+    result_ttl_hours: int = 24
 
     @property
     def audio_dir(self) -> Path:

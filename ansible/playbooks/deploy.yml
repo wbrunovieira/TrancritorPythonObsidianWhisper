@@ -1,0 +1,116 @@
+---
+# Deploy Transcritor — atualiza código, reconstrói imagens e reinicia containers.
+# Funciona tanto no primeiro deploy quanto em atualizações.
+#
+# Uso:
+#   ansible-playbook playbooks/deploy.yml --ask-vault-pass
+#   ansible-playbook playbooks/deploy.yml --vault-password-file ../.vault_pass
+#
+# Pré-requisito local:
+#   pip install ansible
+#   cp group_vars/vault.yml.example group_vars/vault.yml
+#   # editar vault.yml com a API_KEY real, depois:
+#   ansible-vault encrypt group_vars/vault.yml
+
+- name: Deploy Transcritor
+  hosts: transcritor_server
+  gather_facts: yes
+  vars_files:
+    - ../group_vars/all.yml
+    - ../group_vars/vault.yml
+
+  tasks:
+
+    - name: Informações do deploy
+      debug:
+        msg:
+          - "Servidor : {{ ansible_host }}"
+          - "Diretório: {{ app_dir }}"
+          - "Branch   : {{ github_branch }}"
+          - "Modelo   : {{ whisper_model }}"
+
+    # ── Repositório ──────────────────────────────────────────────────────────
+
+    - name: Clonar repositório (primeira vez)
+      git:
+        repo: "{{ github_repo }}"
+        dest: "{{ app_dir }}"
+        version: "{{ github_branch }}"
+        force: yes
+        depth: 1
+      when: not (app_dir + '/.git') is directory
+
+    - name: Atualizar código (deploys seguintes)
+      raw: |
+        cd {{ app_dir }} &&
+        git fetch origin &&
+        git reset --hard origin/{{ github_branch }} &&
+        git log -1 --oneline
+      register: git_result
+
+    - name: Commit implantado
+      debug:
+        msg: "{{ git_result.stdout_lines | last }}"
+      when: git_result.stdout_lines is defined and git_result.stdout_lines | length > 0
+
+    # ── Configuração ─────────────────────────────────────────────────────────
+
+    - name: Escrever .env de produção
+      template:
+        src: ../templates/env.j2
+        dest: "{{ app_dir }}/.env"
+        mode: '0600'
+        owner: root
+        group: root
+
+    # ── Docker ───────────────────────────────────────────────────────────────
+
+    - name: Verificar Docker
+      command: docker compose version
+      register: compose_check
+      failed_when: compose_check.rc != 0
+
+    - name: Build das imagens
+      command: docker compose build --no-cache
+      args:
+        chdir: "{{ app_dir }}"
+      register: build_result
+
+    - name: Subir containers (zero-downtime via recreate)
+      command: docker compose up -d --remove-orphans
+      args:
+        chdir: "{{ app_dir }}"
+
+    # ── Health check ─────────────────────────────────────────────────────────
+
+    - name: Aguardar API ficar saudável
+      uri:
+        url: "http://localhost:{{ app_port }}/health"
+        status_code: 200
+        timeout: 10
+      register: health
+      retries: 12
+      delay: 5
+      until: health.status == 200
+
+    - name: Limpar imagens antigas
+      command: docker image prune -f
+      ignore_errors: yes
+
+    # ── Resumo ────────────────────────────────────────────────────────────────
+
+    - name: Status dos containers
+      command: docker compose ps
+      args:
+        chdir: "{{ app_dir }}"
+      register: compose_ps
+
+    - name: Deploy concluído
+      debug:
+        msg:
+          - "======================================"
+          - "Deploy concluído com sucesso!"
+          - "======================================"
+          - "{{ compose_ps.stdout_lines }}"
+          - "API: http://{{ ansible_host }}:{{ app_port }}/health"
+          - "======================================"

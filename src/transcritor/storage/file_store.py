@@ -24,6 +24,10 @@ class FileStore:
             raise TranscriptionError(f"Result not found for job: {job_id}")
         return TranscriptionResult.model_validate_json(path.read_text(encoding="utf-8"))
 
+    def delete_result(self, job_id: str) -> None:
+        (self._dir / f"{job_id}.json").unlink(missing_ok=True)
+        (self._dir / f"{job_id}.md").unlink(missing_ok=True)
+
     def _to_markdown(self, job_id: str, result: TranscriptionResult) -> str:
         lines = [
             f"# Transcription: {job_id}",

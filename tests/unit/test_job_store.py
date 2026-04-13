@@ -173,3 +173,30 @@ class TestJobStoreListJobs:
         self._setup_list(mock_redis, [])
         store.list_jobs(page=2, page_size=5)
         mock_redis.zrevrange.assert_called_once_with("jobs:all", 5, 9)
+
+
+class TestJobStoreDelete:
+    def test_delete_calls_redis_delete_with_key(self, store, mock_redis):
+        store.delete("abc123")
+        mock_redis.delete.assert_called_once_with("job:abc123")
+
+    def test_delete_calls_zrem_on_sorted_set(self, store, mock_redis):
+        store.delete("abc123")
+        mock_redis.zrem.assert_called_once_with("jobs:all", "abc123")
+
+
+class TestJobStoreListAllIds:
+    def test_returns_empty_list_when_no_jobs(self, store, mock_redis):
+        mock_redis.zrange.return_value = []
+        result = store.list_all_ids()
+        assert result == []
+
+    def test_returns_all_job_ids(self, store, mock_redis):
+        mock_redis.zrange.return_value = [b"job1", b"job2", b"job3"]
+        result = store.list_all_ids()
+        assert result == ["job1", "job2", "job3"]
+
+    def test_calls_zrange_with_full_range(self, store, mock_redis):
+        mock_redis.zrange.return_value = []
+        store.list_all_ids()
+        mock_redis.zrange.assert_called_once_with("jobs:all", 0, -1)

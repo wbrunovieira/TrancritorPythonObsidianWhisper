@@ -1,0 +1,7 @@
+all:
+  hosts:
+    transcritor_server:
+      ansible_host: 45.90.123.190
+      ansible_user: root
+      ansible_ssh_private_key_file: ~/.ssh/id_rsa
+      ansible_python_interpreter: /usr/bin/python3
