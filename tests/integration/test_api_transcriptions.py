@@ -163,6 +163,15 @@ class TestAudioUpload:
         r = await client.post("/transcriptions/audio", files=[_audio_file("audio.m4a")])
         assert r.status_code == 202
 
+    async def test_oga_accepted(self, client):
+        """WhatsApp envia áudio como .oga (OGG Opus) — deve ser aceito."""
+        r = await client.post("/transcriptions/audio", files=[_audio_file("audio.oga")])
+        assert r.status_code == 202
+
+    async def test_ogg_accepted(self, client):
+        r = await client.post("/transcriptions/audio", files=[_audio_file("audio.ogg")])
+        assert r.status_code == 202
+
 
 # ---------------------------------------------------------------------------
 # POST /transcriptions/audio/url
