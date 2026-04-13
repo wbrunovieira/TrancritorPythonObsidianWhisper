@@ -1,7 +1,7 @@
 # Application settings
 app_name: transcritor
 app_dir: /root/transcritor
-app_port: 8000
+app_port: 8010
 
 # GitHub repository
 github_repo: https://github.com/wbrunovieira/TrancritorPythonObsidianWhisper.git

@@ -15,7 +15,7 @@ services:
     build: .
     command: uvicorn transcritor.api.app:app --host 0.0.0.0 --port 8000 --workers 2
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8010:8000"
     env_file: .env
     environment:
       - REDIS_URL=redis://redis:6379/0
