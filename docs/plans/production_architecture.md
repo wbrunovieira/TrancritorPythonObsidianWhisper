@@ -575,6 +575,8 @@ tests/unit/
 | 7 | Rotas completas do backend, remoção do legado | ✅ | 201 testes passando |
 | 8 | yt-dlp YouTube, logging estruturado, hardening | ✅ | 217 unit+integration + 11 e2e (228 total) |
 | 9 | Limpeza de arquivos temporários pós-transcrição | ✅ | 236 testes passando |
+| 9.1 | Segments com timestamps no resultado da transcrição | ✅ | 252 testes passando |
+| 9.2 | Suporte a `.oga` (WhatsApp OGG Opus) | ✅ | 252 testes passando |
 | 10 | Diarização com identificação de locutores por nome | 🔜 | — |
 
 ---
@@ -655,7 +657,7 @@ POST /transcriptions/audio/batch?diarize=true
 - [ ] Criar token Hugging Face e aceitar licença do modelo `pyannote/speaker-diarization-3.1`
 - [ ] Definir qual modelo Claude usar para extração de nomes (custo por job)
 - [ ] Definir comportamento quando não há apresentação no início (fallback)
-- [ ] Decidir se `segments` entra no `TranscriptionResult` existente ou em modelo separado
+- [x] Decidir se `segments` entra no `TranscriptionResult` existente ou em modelo separado — **resolvido: entra no modelo existente como `list[TranscriptionSegment]`**
 
 ### Critérios de aceite (fase futura)
 
@@ -686,5 +688,5 @@ feat(phase-10): add speaker diarization with name identification via pyannote + 
 ---
 
 *Documento criado em: 2026-04-11*  
-*Última atualização: 2026-04-12 — Fase 9 concluída: limpeza de arquivos temporários pós-transcrição (236 testes). Fase 10 planejada: diarização com identificação de locutores por nome.*  
+*Última atualização: 2026-04-13 — Fases 9.1 e 9.2 concluídas: segments com timestamps no resultado, suporte a .oga (WhatsApp). 252 testes. Fase 10 planejada: diarização com identificação de locutores por nome.*  
 *Atualizar este documento ao final de cada fase com o que mudou em relação ao planejado.*

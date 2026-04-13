@@ -91,16 +91,18 @@ Swagger UI: `http://localhost:8000/docs`
 - **`_build_source(source_type, source_kwargs)`** in `tasks.py` is the dispatch table for all input types. Add new source types here.
 - **`/video/url`** auto-detects YouTube URLs via `_is_youtube_url()` and routes to `YouTubeSource`, otherwise `UrlSource` + `VideoSource`.
 - **`get_engine()`** returns a process-level singleton — Whisper model is loaded once per worker process, not per job.
-- **`faster-whisper` API:** `model.transcribe()` returns `(segments_generator, info)`. The generator must be consumed to get text: `"".join(seg.text for seg in segments)`.
+- **`faster-whisper` API:** `model.transcribe()` returns `(segments_generator, info)`. Collect with `list()` before iterating — the generator is consumed once. Each segment has `.text`, `.start`, `.end`.
+- **`TranscriptionResult.segments`** is always populated by the engine: `[TranscriptionSegment(start, end, text), ...]`. Stored in the `.json` result file. Old results without segments deserialize to `[]`.
+- **`_build_source(source_type, source_kwargs)`** returns `(source, cleanup_paths)`. After successful transcription, `run_transcription()` deletes the audio file and any paths in `cleanup_paths` (e.g. source video for `video` and `video_url` jobs).
 - **`compute_type="int8"`** on CPU: ~4× faster than openai-whisper with minimal quality loss.
-- **Job persistence:** status in Redis (sorted set `jobs:all` for listing); result as `.json` + `.md` on disk.
+- **Job persistence:** status in Redis (sorted set `jobs:all` for listing); result as `.json` + `.md` on disk. Audio/video files are deleted after transcription — only the transcript is kept.
 
 ## Testing Strategy
 
 - **Unit tests** (`tests/unit/`): no I/O, no Redis, no model — mock everything. Run in milliseconds.
 - **Integration tests** (`tests/integration/`): real FastAPI + real filesystem + `FakeRedis` + stubbed engine. `CELERY_TASK_ALWAYS_EAGER=True`.
 - **E2e tests** (`tests/e2e/`): full Docker stack required. Run with `-m e2e`.
-- `faster-whisper` mock: `model.transcribe()` must return `([mock_segment], mock_info)` where `mock_segment.text` is a string and `mock_info.language`/`mock_info.duration` are set.
+- `faster-whisper` mock: `model.transcribe()` must return `([mock_segment], mock_info)` where `mock_segment.text`, `.start`, `.end` are set and `mock_info.language`/`mock_info.duration` are set.
 
 ## Environment Variables
 
