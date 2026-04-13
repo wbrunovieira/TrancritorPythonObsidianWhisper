@@ -4,7 +4,7 @@ from pathlib import Path
 from transcritor.sources.file_source import FileSource
 from transcritor.core.exceptions import UnsupportedFormatError, SourceUnavailableError
 
-SUPPORTED_EXTENSIONS = [".mp3", ".wav", ".m4a", ".flac", ".ogg"]
+SUPPORTED_EXTENSIONS = [".mp3", ".wav", ".m4a", ".flac", ".ogg", ".oga"]
 UNSUPPORTED_EXTENSIONS = [".pdf", ".xyz", ".txt", ".docx", ".py"]
 
 
