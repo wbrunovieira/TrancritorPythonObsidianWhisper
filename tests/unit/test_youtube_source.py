@@ -89,6 +89,96 @@ class TestYouTubeSource:
         with pytest.raises(ValueError, match="Invalid YouTube URL"):
             YouTubeSource(url="https://example.com/not-youtube", download_dir=tmp_path)
 
+    def test_cookies_file_passed_to_ydl_opts_when_exists(self, tmp_path):
+        from transcritor.sources.youtube_source import YouTubeSource
+
+        cookies_file = tmp_path / "cookies.txt"
+        cookies_file.write_text("# cookies")
+
+        source = YouTubeSource(
+            url="https://www.youtube.com/watch?v=abc123",
+            download_dir=tmp_path,
+            cookies_file=cookies_file,
+        )
+
+        with patch("transcritor.sources.youtube_source.yt_dlp") as mock_yt:
+            mock_ydl = MagicMock()
+            mock_ydl.__enter__ = MagicMock(return_value=mock_ydl)
+            mock_ydl.__exit__ = MagicMock(return_value=False)
+
+            def extract_and_create(url, download):
+                opts = mock_yt.YoutubeDL.call_args[0][0]
+                template = opts["outtmpl"]
+                uuid_stem = Path(template).name.split(".")[0]
+                (tmp_path / f"{uuid_stem}.m4a").write_bytes(b"fake")
+                return {"ext": "m4a"}
+
+            mock_ydl.extract_info.side_effect = extract_and_create
+            mock_yt.YoutubeDL.return_value = mock_ydl
+
+            source.acquire()
+
+        opts = mock_yt.YoutubeDL.call_args[0][0]
+        assert opts.get("cookiefile") == str(cookies_file)
+
+    def test_cookies_file_not_passed_when_none(self, tmp_path):
+        from transcritor.sources.youtube_source import YouTubeSource
+
+        source = YouTubeSource(
+            url="https://www.youtube.com/watch?v=abc123",
+            download_dir=tmp_path,
+            cookies_file=None,
+        )
+
+        with patch("transcritor.sources.youtube_source.yt_dlp") as mock_yt:
+            mock_ydl = MagicMock()
+            mock_ydl.__enter__ = MagicMock(return_value=mock_ydl)
+            mock_ydl.__exit__ = MagicMock(return_value=False)
+
+            def extract_and_create(url, download):
+                opts = mock_yt.YoutubeDL.call_args[0][0]
+                template = opts["outtmpl"]
+                uuid_stem = Path(template).name.split(".")[0]
+                (tmp_path / f"{uuid_stem}.m4a").write_bytes(b"fake")
+                return {"ext": "m4a"}
+
+            mock_ydl.extract_info.side_effect = extract_and_create
+            mock_yt.YoutubeDL.return_value = mock_ydl
+
+            source.acquire()
+
+        opts = mock_yt.YoutubeDL.call_args[0][0]
+        assert "cookiefile" not in opts
+
+    def test_cookies_file_not_passed_when_file_missing(self, tmp_path):
+        from transcritor.sources.youtube_source import YouTubeSource
+
+        source = YouTubeSource(
+            url="https://www.youtube.com/watch?v=abc123",
+            download_dir=tmp_path,
+            cookies_file=tmp_path / "nonexistent_cookies.txt",
+        )
+
+        with patch("transcritor.sources.youtube_source.yt_dlp") as mock_yt:
+            mock_ydl = MagicMock()
+            mock_ydl.__enter__ = MagicMock(return_value=mock_ydl)
+            mock_ydl.__exit__ = MagicMock(return_value=False)
+
+            def extract_and_create(url, download):
+                opts = mock_yt.YoutubeDL.call_args[0][0]
+                template = opts["outtmpl"]
+                uuid_stem = Path(template).name.split(".")[0]
+                (tmp_path / f"{uuid_stem}.m4a").write_bytes(b"fake")
+                return {"ext": "m4a"}
+
+            mock_ydl.extract_info.side_effect = extract_and_create
+            mock_yt.YoutubeDL.return_value = mock_ydl
+
+            source.acquire()
+
+        opts = mock_yt.YoutubeDL.call_args[0][0]
+        assert "cookiefile" not in opts
+
     def test_acquire_raises_if_yt_dlp_not_installed(self, tmp_path):
         import sys
         import importlib

@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     api_key: str = ""
     result_ttl_hours: int = 24
+    youtube_cookies_file: Path = Path("/config/youtube_cookies.txt")
 
     @property
     def audio_dir(self) -> Path:

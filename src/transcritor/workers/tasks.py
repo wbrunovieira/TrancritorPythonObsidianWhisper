@@ -51,7 +51,11 @@ def _build_source(source_type: str, source_kwargs: dict) -> tuple:
         from transcritor.sources.youtube_source import YouTubeSource
         from transcritor.config import get_settings
         settings = get_settings()
-        return YouTubeSource(url=source_kwargs["url"], download_dir=settings.audio_dir), []
+        return YouTubeSource(
+            url=source_kwargs["url"],
+            download_dir=settings.audio_dir,
+            cookies_file=settings.youtube_cookies_file,
+        ), []
 
     if source_type == "extract":
         from transcritor.sources.video_source import VideoSource

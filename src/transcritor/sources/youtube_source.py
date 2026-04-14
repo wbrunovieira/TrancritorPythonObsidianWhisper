@@ -21,11 +21,12 @@ def _is_youtube_url(url: str) -> bool:
 
 
 class YouTubeSource:
-    def __init__(self, url: str, download_dir: Path | None = None):
+    def __init__(self, url: str, download_dir: Path | None = None, cookies_file: Path | None = None):
         if not _is_youtube_url(url):
             raise ValueError(f"Invalid YouTube URL: {url!r}")
         self._url = url
         self._download_dir = download_dir or Path("/tmp")
+        self._cookies_file = Path(cookies_file) if cookies_file else None
 
     def acquire(self) -> Path:
         if yt_dlp is None:
@@ -47,6 +48,9 @@ class YouTubeSource:
                 }
             ],
         }
+
+        if self._cookies_file and self._cookies_file.exists():
+            ydl_opts["cookiefile"] = str(self._cookies_file)
 
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
