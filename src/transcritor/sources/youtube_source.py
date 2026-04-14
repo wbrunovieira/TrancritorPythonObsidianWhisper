@@ -39,7 +39,7 @@ class YouTubeSource:
 
         output_template = str(self._download_dir / f"{uuid4().hex}.%(ext)s")
         ydl_opts = {
-            "format": "bestaudio/best",
+            "format": "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best",
             "outtmpl": output_template,
             "quiet": True,
             "no_warnings": True,
