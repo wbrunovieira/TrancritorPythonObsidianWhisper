@@ -33,6 +33,7 @@ class YouTubeSource:
 
         cmd = [
             "yt-dlp",
+            "--no-playlist",
             "--format", "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best",
             "--output", output_template,
             "--quiet",
@@ -40,7 +41,6 @@ class YouTubeSource:
             "--extractor-args", "youtube:player_client=web",
             "--js-runtimes", "node:/usr/bin/node",
             "--remote-components", "ejs:github",
-            "--postprocessor-args", "FFmpegExtractAudio:-vn",
             "--extract-audio",
             "--audio-format", "m4a",
         ]
