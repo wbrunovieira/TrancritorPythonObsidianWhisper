@@ -11,7 +11,8 @@ COPY pyproject.toml ./
 COPY src/ ./src/
 
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -e ".[transcription,api]"
+    pip install --no-cache-dir -e ".[transcription,api]" && \
+    pip install --no-cache-dir yt-dlp-youtube-oauth2
 
 
 # ─── Stage 2: runtime ─────────────────────────────────────────────────────────

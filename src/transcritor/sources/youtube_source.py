@@ -1,7 +1,4 @@
-import os
-import shutil
 import subprocess
-import tempfile
 from pathlib import Path
 from uuid import uuid4
 
@@ -45,13 +42,11 @@ class YouTubeSource:
             "--audio-format", "m4a",
         ]
 
-        tmp_cookies = None
-        if self._cookies_file and self._cookies_file.exists():
-            tmp_fd, tmp_path = tempfile.mkstemp(suffix=".txt", prefix="yt_cookies_")
-            os.close(tmp_fd)
-            shutil.copy2(str(self._cookies_file), tmp_path)
-            tmp_cookies = tmp_path
-            cmd += ["--cookies", tmp_cookies]
+        # OAuth2 token persisted in /config (bind mount) — not invalidated on IP change.
+        # Token is written there by: yt-dlp --username oauth2 --password '' --cache-dir /config <url>
+        oauth_token_file = Path("/config/yt-dlp/youtube-oauth2.token")
+        if oauth_token_file.exists():
+            cmd += ["--username", "oauth2", "--password", "", "--cache-dir", "/config"]
 
         cmd.append(self._url)
 
@@ -73,12 +68,6 @@ class YouTubeSource:
             raise SourceUnavailableError(
                 f"Failed to download YouTube video {self._url}: {e}"
             ) from e
-        finally:
-            if tmp_cookies:
-                try:
-                    Path(tmp_cookies).unlink(missing_ok=True)
-                except OSError:
-                    pass
 
     def _find_downloaded_file(self, output_template: str, uuid_stem: str) -> Path:
         parent = Path(output_template).parent
