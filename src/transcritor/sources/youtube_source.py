@@ -44,8 +44,8 @@ class YouTubeSource:
             "quiet": True,
             "no_warnings": True,
             "extractor_args": {"youtube": {"player_client": ["web"]}},
-            "js_runtimes": ["node:/usr/bin/node"],
-            "remote_components": "ejs:github",
+            "js_runtimes": {"node": {"path": "/usr/bin/node"}},
+            "remote_components": ["ejs:github"],
             "postprocessors": [
                 {
                     "key": "FFmpegExtractAudio",
