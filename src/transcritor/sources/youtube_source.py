@@ -1,12 +1,9 @@
+import os
 import shutil
+import subprocess
 import tempfile
 from pathlib import Path
 from uuid import uuid4
-
-try:
-    import yt_dlp
-except ImportError:
-    yt_dlp = None  # type: ignore[assignment]
 
 from transcritor.core.exceptions import SourceUnavailableError
 
@@ -31,55 +28,48 @@ class YouTubeSource:
         self._cookies_file = Path(cookies_file) if cookies_file else None
 
     def acquire(self) -> Path:
-        if yt_dlp is None:
-            raise ImportError(
-                "yt-dlp is not installed. "
-                "Run: pip install 'transcritor[transcription]'"
-            )
+        uuid_stem = uuid4().hex
+        output_template = str(self._download_dir / f"{uuid_stem}.%(ext)s")
 
-        output_template = str(self._download_dir / f"{uuid4().hex}.%(ext)s")
-        ydl_opts = {
-            "format": "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best",
-            "outtmpl": output_template,
-            "quiet": True,
-            "no_warnings": True,
-            "extractor_args": {"youtube": {"player_client": ["web"]}},
-            "js_runtimes": {"node": {"path": "/usr/bin/node"}},
-            "remote_components": ["ejs:github"],
-            "postprocessors": [
-                {
-                    "key": "FFmpegExtractAudio",
-                    "preferredcodec": "m4a",
-                }
-            ],
-        }
+        cmd = [
+            "yt-dlp",
+            "--format", "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best",
+            "--output", output_template,
+            "--quiet",
+            "--no-warnings",
+            "--extractor-args", "youtube:player_client=web",
+            "--js-runtimes", "node:/usr/bin/node",
+            "--remote-components", "ejs:github",
+            "--postprocessor-args", "FFmpegExtractAudio:-vn",
+            "--extract-audio",
+            "--audio-format", "m4a",
+        ]
 
         tmp_cookies = None
         if self._cookies_file and self._cookies_file.exists():
-            # Copy to a writable temp file so yt-dlp never overwrites the original
             tmp_fd, tmp_path = tempfile.mkstemp(suffix=".txt", prefix="yt_cookies_")
-            import os; os.close(tmp_fd)
+            os.close(tmp_fd)
             shutil.copy2(str(self._cookies_file), tmp_path)
             tmp_cookies = tmp_path
-            ydl_opts["cookiefile"] = tmp_cookies
+            cmd += ["--cookies", tmp_cookies]
+
+        cmd.append(self._url)
 
         try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(self._url, download=True)
-                # After postprocessing, find the downloaded audio file
-                downloaded = self._find_downloaded_file(output_template, info)
-                return downloaded
-        except Exception as e:
-            _download_error = getattr(yt_dlp, "DownloadError", None)
-            is_download_error = (
-                isinstance(_download_error, type)
-                and issubclass(_download_error, BaseException)
-                and isinstance(e, _download_error)
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
             )
-            if is_download_error:
+            if result.returncode != 0:
+                stderr = result.stderr.strip() or result.stdout.strip()
                 raise SourceUnavailableError(
-                    f"YouTube download unavailable for {self._url}: {e}"
-                ) from e
+                    f"YouTube download unavailable for {self._url}: {stderr}"
+                )
+            return self._find_downloaded_file(output_template, uuid_stem)
+        except SourceUnavailableError:
+            raise
+        except Exception as e:
             raise SourceUnavailableError(
                 f"Failed to download YouTube video {self._url}: {e}"
             ) from e
@@ -90,20 +80,10 @@ class YouTubeSource:
                 except OSError:
                     pass
 
-    def _find_downloaded_file(self, output_template: str, info: dict) -> Path:
-        # output_template is like "/tmp/<uuid>.%(ext)s"
-        # Split on "." and take the first part (the UUID) as the stem
+    def _find_downloaded_file(self, output_template: str, uuid_stem: str) -> Path:
         parent = Path(output_template).parent
-        uuid_stem = Path(output_template).name.split(".")[0]
-
-        # Try known audio extensions in preference order
         for ext in ("m4a", "mp3", "ogg", "opus", "wav", "webm"):
             candidate = parent / f"{uuid_stem}.{ext}"
-            if candidate.exists():
-                return candidate
-        # Fallback: use the ext reported by yt-dlp before postprocessing
-        if info and "ext" in info:
-            candidate = parent / f"{uuid_stem}.{info['ext']}"
             if candidate.exists():
                 return candidate
         raise SourceUnavailableError(
