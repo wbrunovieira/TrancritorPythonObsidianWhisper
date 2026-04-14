@@ -43,6 +43,7 @@ class YouTubeSource:
             "outtmpl": output_template,
             "quiet": True,
             "no_warnings": True,
+            "extractor_args": {"youtube": {"player_client": ["ios"]}},
             "postprocessors": [
                 {
                     "key": "FFmpegExtractAudio",
