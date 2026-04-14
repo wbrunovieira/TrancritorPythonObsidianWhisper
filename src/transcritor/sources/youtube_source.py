@@ -35,9 +35,6 @@ class YouTubeSource:
             "--output", output_template,
             "--quiet",
             "--no-warnings",
-            "--extractor-args", "youtube:player_client=web",
-            "--js-runtimes", "node:/usr/bin/node",
-            "--remote-components", "ejs:github",
             "--extract-audio",
             "--audio-format", "m4a",
         ]

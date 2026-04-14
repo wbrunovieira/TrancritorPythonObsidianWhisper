@@ -20,7 +20,6 @@ FROM python:3.11-slim AS runtime
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
-    nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy installed packages from builder
