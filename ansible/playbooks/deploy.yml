@@ -99,6 +99,11 @@
       delay: 5
       until: health.status == 200
 
+    - name: Permissões do frontend (nginx roda como www-data)
+      shell: |
+        chmod o+x /root /root/transcritor /root/transcritor/frontend
+        chmod -R o+r {{ app_dir }}/frontend
+
     - name: Limpar imagens antigas
       command: docker image prune -f
       ignore_errors: yes
