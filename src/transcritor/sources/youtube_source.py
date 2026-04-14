@@ -43,7 +43,8 @@ class YouTubeSource:
             "outtmpl": output_template,
             "quiet": True,
             "no_warnings": True,
-            "extractor_args": {"youtube": {"player_client": ["tv_embedded"]}},
+            "extractor_args": {"youtube": {"player_client": ["web"]}},
+            "js_runtimes": ["nodejs:/usr/bin/node"],
             "postprocessors": [
                 {
                     "key": "FFmpegExtractAudio",
