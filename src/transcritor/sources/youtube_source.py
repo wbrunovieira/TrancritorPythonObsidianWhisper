@@ -1,3 +1,5 @@
+import shutil
+import tempfile
 from pathlib import Path
 from uuid import uuid4
 
@@ -49,8 +51,14 @@ class YouTubeSource:
             ],
         }
 
+        tmp_cookies = None
         if self._cookies_file and self._cookies_file.exists():
-            ydl_opts["cookiefile"] = str(self._cookies_file)
+            # Copy to a writable temp file so yt-dlp never overwrites the original
+            tmp_fd, tmp_path = tempfile.mkstemp(suffix=".txt", prefix="yt_cookies_")
+            import os; os.close(tmp_fd)
+            shutil.copy2(str(self._cookies_file), tmp_path)
+            tmp_cookies = tmp_path
+            ydl_opts["cookiefile"] = tmp_cookies
 
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -72,6 +80,12 @@ class YouTubeSource:
             raise SourceUnavailableError(
                 f"Failed to download YouTube video {self._url}: {e}"
             ) from e
+        finally:
+            if tmp_cookies:
+                try:
+                    Path(tmp_cookies).unlink(missing_ok=True)
+                except OSError:
+                    pass
 
     def _find_downloaded_file(self, output_template: str, info: dict) -> Path:
         # output_template is like "/tmp/<uuid>.%(ext)s"
