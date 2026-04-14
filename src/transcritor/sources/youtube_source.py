@@ -44,7 +44,7 @@ class YouTubeSource:
             "quiet": True,
             "no_warnings": True,
             "extractor_args": {"youtube": {"player_client": ["web"]}},
-            "js_runtimes": ["nodejs:/usr/bin/node"],
+            "js_runtimes": ["node:/usr/bin/node"],
             "postprocessors": [
                 {
                     "key": "FFmpegExtractAudio",
