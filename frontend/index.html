@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Transcritor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div class="bg-grid" aria-hidden="true"></div>
+
+  <header>
+    <div class="header-inner">
+      <div class="logo">
+        <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/>
+          <path d="M19 10v1a7 7 0 0 1-14 0v-1"/>
+          <line x1="12" y1="19" x2="12" y2="22"/>
+          <line x1="8"  y1="22" x2="16" y2="22"/>
+        </svg>
+        <span>Transcritor</span>
+      </div>
+      <p class="tagline">Whisper large-v3-turbo &nbsp;·&nbsp; faster-whisper</p>
+    </div>
+  </header>
+
+  <main>
+    <div class="cards">
+
+      <!-- ── YouTube ─────────────────────────────────────────── -->
+      <div class="card" id="card-yt" style="--accent:#ff4040;--delay:0ms">
+        <div class="card-bar"></div>
+        <div class="card-inner">
+
+          <div class="card-head">
+            <span class="card-icon">
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5a3 3 0 0 0-2.1 2.1C0 8.1 0 12 0 12s0 3.9.5 5.8a3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1C24 15.9 24 12 24 12s0-3.9-.5-5.8zM9.7 15.5V8.5l6.2 3.5-6.2 3.5z"/>
+              </svg>
+            </span>
+            <div>
+              <h2>YouTube</h2>
+              <p>Cole o link de qualquer vídeo</p>
+            </div>
+          </div>
+
+          <div class="field url-field">
+            <input type="url" id="yt-url" class="text-input" placeholder="https://youtube.com/watch?v=…" autocomplete="off" spellcheck="false">
+            <button class="paste-btn" data-target="yt-url" title="Colar">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2"/>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              </svg>
+            </button>
+          </div>
+
+          <button class="submit-btn" id="btn-yt">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+            <span class="btn-label">Transcrever</span>
+            <span class="btn-spinner" aria-hidden="true"></span>
+          </button>
+
+          <div class="feedback hidden" id="fb-yt">
+            <div class="status-row">
+              <span class="pulse-dot"></span>
+              <span class="status-msg" id="msg-yt">Aguardando…</span>
+            </div>
+          </div>
+
+          <div class="result hidden" id="res-yt">
+            <div class="result-meta" id="meta-yt"></div>
+            <div class="result-text" id="text-yt" contenteditable="false"></div>
+            <div class="result-actions">
+              <button class="action copy-btn" data-src="text-yt">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="9" y="9" width="13" height="13" rx="2"/>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                </svg>
+                Copiar
+              </button>
+              <button class="action download-btn" data-src="text-yt" data-name="yt">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                Baixar .txt
+              </button>
+            </div>
+          </div>
+
+          <div class="error-box hidden" id="err-yt">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            <span id="err-yt-msg"></span>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ── Áudio ───────────────────────────────────────────── -->
+      <div class="card" id="card-audio" style="--accent:#22d4a0;--delay:80ms">
+        <div class="card-bar"></div>
+        <div class="card-inner">
+
+          <div class="card-head">
+            <span class="card-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
+              </svg>
+            </span>
+            <div>
+              <h2>Áudio</h2>
+              <p>MP3, WAV, M4A, FLAC, OGG, OGA</p>
+            </div>
+          </div>
+
+          <label class="dropzone" id="drop-audio" for="file-audio">
+            <input type="file" id="file-audio" accept=".mp3,.wav,.m4a,.flac,.ogg,.oga" hidden>
+            <div class="drop-idle" id="drop-idle-audio">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/>
+                <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+              </svg>
+              <p>Arraste ou <strong>clique para selecionar</strong></p>
+              <span>Máx. 500 MB</span>
+            </div>
+            <div class="drop-selected hidden" id="drop-sel-audio">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+              <span id="fname-audio"></span>
+              <button class="clear-file" data-input="file-audio" data-card="audio" type="button">✕</button>
+            </div>
+          </label>
+
+          <button class="submit-btn" id="btn-audio">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+            <span class="btn-label">Transcrever</span>
+            <span class="btn-spinner" aria-hidden="true"></span>
+          </button>
+
+          <div class="feedback hidden" id="fb-audio">
+            <div class="status-row">
+              <span class="pulse-dot"></span>
+              <span class="status-msg" id="msg-audio">Aguardando…</span>
+            </div>
+          </div>
+
+          <div class="result hidden" id="res-audio">
+            <div class="result-meta" id="meta-audio"></div>
+            <div class="result-text" id="text-audio" contenteditable="false"></div>
+            <div class="result-actions">
+              <button class="action copy-btn" data-src="text-audio">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="9" y="9" width="13" height="13" rx="2"/>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                </svg>
+                Copiar
+              </button>
+              <button class="action download-btn" data-src="text-audio" data-name="audio">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                Baixar .txt
+              </button>
+            </div>
+          </div>
+
+          <div class="error-box hidden" id="err-audio">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            <span id="err-audio-msg"></span>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ── Vídeo ───────────────────────────────────────────── -->
+      <div class="card" id="card-video" style="--accent:#4896ff;--delay:160ms">
+        <div class="card-bar"></div>
+        <div class="card-inner">
+
+          <div class="card-head">
+            <span class="card-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="7" width="15" height="14" rx="2"/>
+                <polyline points="17 8 22 5 22 19 17 16"/>
+              </svg>
+            </span>
+            <div>
+              <h2>Vídeo</h2>
+              <p>MP4, MOV, AVI, MKV, WEBM</p>
+            </div>
+          </div>
+
+          <label class="dropzone" id="drop-video" for="file-video">
+            <input type="file" id="file-video" accept=".mp4,.mov,.avi,.mkv,.webm,.m4v" hidden>
+            <div class="drop-idle" id="drop-idle-video">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/>
+                <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+              </svg>
+              <p>Arraste ou <strong>clique para selecionar</strong></p>
+              <span>Máx. 500 MB</span>
+            </div>
+            <div class="drop-selected hidden" id="drop-sel-video">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+              <span id="fname-video"></span>
+              <button class="clear-file" data-input="file-video" data-card="video" type="button">✕</button>
+            </div>
+          </label>
+
+          <button class="submit-btn" id="btn-video">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+            <span class="btn-label">Transcrever</span>
+            <span class="btn-spinner" aria-hidden="true"></span>
+          </button>
+
+          <div class="feedback hidden" id="fb-video">
+            <div class="status-row">
+              <span class="pulse-dot"></span>
+              <span class="status-msg" id="msg-video">Aguardando…</span>
+            </div>
+          </div>
+
+          <div class="result hidden" id="res-video">
+            <div class="result-meta" id="meta-video"></div>
+            <div class="result-text" id="text-video" contenteditable="false"></div>
+            <div class="result-actions">
+              <button class="action copy-btn" data-src="text-video">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="9" y="9" width="13" height="13" rx="2"/>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                </svg>
+                Copiar
+              </button>
+              <button class="action download-btn" data-src="text-video" data-name="video">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                Baixar .txt
+              </button>
+            </div>
+          </div>
+
+          <div class="error-box hidden" id="err-video">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            <span id="err-video-msg"></span>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <div class="toast hidden" id="toast">Copiado!</div>
+
+  <script src="app.js"></script>
+</body>
+</html>

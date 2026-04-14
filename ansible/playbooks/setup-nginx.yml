@@ -1,0 +1,53 @@
+---
+# Setup único: nginx + SSL para transcritor.wbdigitalsolutions.com
+# Rodar apenas uma vez (ou quando o config do nginx mudar).
+#
+# Uso:
+#   ansible-playbook playbooks/setup-nginx.yml -e @../group_vars/vault.yml
+
+- name: Setup Nginx + SSL — Transcritor
+  hosts: transcritor_server
+  gather_facts: yes
+  vars_files:
+    - ../group_vars/all.yml
+    - ../group_vars/vault.yml
+
+  vars:
+    domain:    transcritor.wbdigitalsolutions.com
+    ssl_email: admin@wbdigitalsolutions.com
+
+  tasks:
+
+    - name: Escrever config nginx
+      template:
+        src:   ../templates/nginx-transcritor.conf.j2
+        dest:  /etc/nginx/sites-available/{{ domain }}.conf
+        mode:  '0644'
+
+    - name: Ativar site (symlink)
+      file:
+        src:   /etc/nginx/sites-available/{{ domain }}.conf
+        dest:  /etc/nginx/sites-enabled/{{ domain }}.conf
+        state: link
+
+    - name: Testar config nginx
+      command: nginx -t
+      register: nginx_test
+
+    - name: Recarregar nginx
+      systemd:
+        name:  nginx
+        state: reloaded
+      when: nginx_test.rc == 0
+
+    - name: Emitir certificado SSL (Let's Encrypt)
+      command: >
+        certbot --nginx -n --agree-tos
+        --email {{ ssl_email }}
+        -d {{ domain }}
+        --redirect
+      register: certbot_result
+
+    - name: Resultado do certbot
+      debug:
+        msg: "{{ certbot_result.stdout_lines }}"
