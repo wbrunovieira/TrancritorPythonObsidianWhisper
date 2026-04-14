@@ -12,14 +12,17 @@ COPY src/ ./src/
 
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -e ".[transcription,api]" && \
-    pip install --no-cache-dir yt-dlp-youtube-oauth2
+    pip install --no-cache-dir bgutil-ytdlp-pot-provider
 
 
 # ─── Stage 2: runtime ─────────────────────────────────────────────────────────
 FROM python:3.11-slim AS runtime
 
+# Install ffmpeg + Node.js (required by bgutil-ytdlp-pot-provider for PO token generation)
 RUN apt-get update --fix-missing && apt-get install -y --no-install-recommends \
     ffmpeg \
+    nodejs \
+    npm \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy installed packages from builder

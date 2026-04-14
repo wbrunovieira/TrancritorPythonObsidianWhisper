@@ -28,6 +28,8 @@ class YouTubeSource:
         uuid_stem = uuid4().hex
         output_template = str(self._download_dir / f"{uuid_stem}.%(ext)s")
 
+        # bgutil-ytdlp-pot-provider is installed and generates PO tokens automatically.
+        # No cookies or OAuth needed — the plugin handles bot detection bypass.
         cmd = [
             "yt-dlp",
             "--no-playlist",
@@ -38,12 +40,6 @@ class YouTubeSource:
             "--extract-audio",
             "--audio-format", "m4a",
         ]
-
-        # OAuth2 token persisted in /config (bind mount) — not invalidated on IP change.
-        # Token is written there by: yt-dlp --username oauth2 --password '' --cache-dir /config <url>
-        oauth_token_file = Path("/config/yt-dlp/youtube-oauth2.token")
-        if oauth_token_file.exists():
-            cmd += ["--username", "oauth2", "--password", "", "--cache-dir", "/config"]
 
         cmd.append(self._url)
 
