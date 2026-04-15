@@ -18,9 +18,10 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # ─── Stage 2: runtime ─────────────────────────────────────────────────────────
 FROM python:3.11-slim AS runtime
 
-# Install ffmpeg
+# Install ffmpeg + Node.js (EJS JS runtime required by yt-dlp for YouTube extraction)
 RUN apt-get update --fix-missing && apt-get install -y --no-install-recommends \
     ffmpeg \
+    nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy installed packages from builder
@@ -41,9 +42,10 @@ RUN useradd --create-home --shell /bin/bash appuser && \
     mkdir -p /home/appuser/.cache/huggingface && \
     chown -R appuser:appuser /app /data /home/appuser/.cache
 
-# yt-dlp config: point to bgutil POT provider HTTP server (runs as a sibling container)
+# yt-dlp config: Node.js as EJS runtime + bgutil POT provider HTTP server (sibling container)
 RUN mkdir -p /home/appuser/.config/yt-dlp && \
     printf '%s\n' \
+      '--js-runtimes node:/usr/bin/node' \
       '--extractor-args youtubepot-bgutilhttp:base_url=http://bgutil:4416' \
       > /home/appuser/.config/yt-dlp/config && \
     chown -R appuser:appuser /home/appuser/.config
