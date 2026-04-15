@@ -43,6 +43,11 @@ RUN useradd --create-home --shell /bin/bash appuser && \
     mkdir -p /home/appuser/.cache/huggingface && \
     chown -R appuser:appuser /app /data /home/appuser/.cache
 
+# yt-dlp config: use node as JS runtime for challenge solving
+RUN mkdir -p /home/appuser/.config/yt-dlp && \
+    echo '--js-runtimes node:/usr/bin/node' > /home/appuser/.config/yt-dlp/config && \
+    chown -R appuser:appuser /home/appuser/.config
+
 USER appuser
 
 ENV PYTHONUNBUFFERED=1 \
