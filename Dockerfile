@@ -18,11 +18,9 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # ─── Stage 2: runtime ─────────────────────────────────────────────────────────
 FROM python:3.11-slim AS runtime
 
-# Install ffmpeg + Node.js (required by bgutil-ytdlp-pot-provider for PO token generation)
+# Install ffmpeg
 RUN apt-get update --fix-missing && apt-get install -y --no-install-recommends \
     ffmpeg \
-    nodejs \
-    npm \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy installed packages from builder
@@ -43,9 +41,11 @@ RUN useradd --create-home --shell /bin/bash appuser && \
     mkdir -p /home/appuser/.cache/huggingface && \
     chown -R appuser:appuser /app /data /home/appuser/.cache
 
-# yt-dlp config: use node as JS runtime for challenge solving
+# yt-dlp config: point to bgutil POT provider HTTP server (runs as a sibling container)
 RUN mkdir -p /home/appuser/.config/yt-dlp && \
-    echo '--js-runtimes node:/usr/bin/node' > /home/appuser/.config/yt-dlp/config && \
+    printf '%s\n' \
+      '--extractor-args youtubepot-bgutilhttp:base_url=http://bgutil:4416' \
+      > /home/appuser/.config/yt-dlp/config && \
     chown -R appuser:appuser /home/appuser/.config
 
 USER appuser
