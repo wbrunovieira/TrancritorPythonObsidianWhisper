@@ -204,14 +204,20 @@ main { position: relative; z-index: 1; padding: 1rem 1.5rem 4rem; }
 
 .btn-icon { width: 15px; height: 15px; flex-shrink: 0; }
 
-/* spinner inside button */
-.btn-spinner {
-  width: 16px; height: 16px; flex-shrink: 0;
-  border: 2px solid rgba(255,255,255,.25);
-  border-top-color: #fff;
-  border-radius: 50%;
-  animation: spin .7s linear infinite;
+/* waveform bars inside button */
+.btn-waves {
+  display: inline-flex; align-items: center; gap: 2.5px;
+  height: 16px; flex-shrink: 0;
 }
+.btn-waves span {
+  display: block; width: 3px;
+  background: rgba(255,255,255,.9);
+  border-radius: 2px;
+  animation: wave-bar .85s ease-in-out infinite;
+}
+.btn-waves span:nth-child(1) { animation-delay: 0s; }
+.btn-waves span:nth-child(2) { animation-delay: .17s; }
+.btn-waves span:nth-child(3) { animation-delay: .34s; }
 
 /* ── Feedback / status ─────────────────────────────────────────────────── */
 .feedback {
@@ -222,11 +228,20 @@ main { position: relative; z-index: 1; padding: 1rem 1.5rem 4rem; }
 }
 .status-row { display: flex; align-items: center; gap: .65rem; font-size: .82rem; color: var(--muted); }
 
-.pulse-dot {
-  width: 8px; height: 8px; flex-shrink: 0;
+/* scanning track — reads as "waiting", not "processing" */
+.status-track {
+  width: 32px; height: 3px; flex-shrink: 0;
+  background: var(--border);
+  border-radius: 99px;
+  overflow: hidden;
+  position: relative;
+}
+.status-track::after {
+  content: '';
+  position: absolute; inset: 0;
   background: var(--accent, var(--purple));
-  border-radius: 50%;
-  animation: pulse 1.4s ease-in-out infinite;
+  border-radius: 99px;
+  animation: track-scan 1.8s ease-in-out infinite;
 }
 
 .status-msg { transition: opacity .3s; }
@@ -313,12 +328,14 @@ main { position: relative; z-index: 1; padding: 1rem 1.5rem 4rem; }
   from { opacity: 0; transform: translateY(10px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-@keyframes spin {
-  to { transform: rotate(360deg); }
+@keyframes wave-bar {
+  0%, 100% { height: 3px; }
+  50%       { height: 14px; }
 }
-@keyframes pulse {
-  0%, 100% { opacity: 1;   transform: scale(1); }
-  50%       { opacity: .4; transform: scale(.75); }
+@keyframes track-scan {
+  0%   { transform: translateX(-100%); }
+  50%  { transform: translateX(0%); }
+  100% { transform: translateX(100%); }
 }
 
 /* ── Responsive ────────────────────────────────────────────────────────── */

@@ -119,7 +119,7 @@ function createCard({ btnId, feedbackId, msgId, resultId, metaId, textId, errorI
   function setLoading(on) {
     btn.disabled = on;
     btn.querySelector('.btn-icon').classList.toggle('hidden', on);
-    btn.querySelector('.btn-spinner').classList.toggle('hidden', !on);
+    btn.querySelector('.btn-waves').classList.toggle('hidden', !on);
   }
 
   function setStatus(status) {
