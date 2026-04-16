@@ -30,8 +30,13 @@
   <main>
     <div class="cards">
 
-      <!-- ── YouTube ─────────────────────────────────────────── -->
-      <div class="card" id="card-yt" style="--accent:#ff4040;--delay:0ms">
+      <!-- ── YouTube (DESATIVADO) ──────────────────────────────
+           O IP do VPS (Contabo) está bloqueado pelo Google a nível de rede.
+           O yt-dlp com bgutil POT provider gera tokens válidos, mas o
+           YouTube retorna LOGIN_REQUIRED independentemente.
+           Para reativar, ver comentário em youtube_source.py.
+      -->
+      <div class="card" id="card-yt" style="--accent:#ff4040;--delay:0ms;opacity:0.45;pointer-events:none;user-select:none">
         <div class="card-bar"></div>
         <div class="card-inner">
 
@@ -43,7 +48,7 @@
             </span>
             <div>
               <h2>YouTube</h2>
-              <p>Cole o link de qualquer vídeo</p>
+              <p>Temporariamente indisponível</p>
             </div>
           </div>
 
