@@ -1,7 +1,7 @@
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 
 from transcritor.api.dependencies import get_transcription_service, verify_api_key
 from transcritor.api.schemas import (
@@ -52,13 +52,15 @@ def _validate_extension(filename: str, supported: set[str]) -> str:
 @router.post("/audio", status_code=202, response_model=JobCreatedResponse)
 async def transcribe_audio_upload(
     file: UploadFile = File(...),
+    callback_url: str | None = Form(None),
+    callback_secret: str | None = Form(None),
     service: TranscriptionService = Depends(get_transcription_service),
     settings: Settings = Depends(get_settings),
 ) -> JobCreatedResponse:
     _validate_extension(file.filename or "", SUPPORTED_AUDIO_EXTENSIONS)
     content = await file.read()
     saved_path = _save_upload(file, content, settings)
-    job = service.submit_job("file", {"path": str(saved_path)})
+    job = service.submit_job("file", {"path": str(saved_path)}, callback_url=callback_url, callback_secret=callback_secret)
     return JobCreatedResponse(job_id=job.job_id, status=job.status)
 
 
@@ -67,7 +69,7 @@ def transcribe_audio_url(
     request: UrlTranscriptionRequest,
     service: TranscriptionService = Depends(get_transcription_service),
 ) -> JobCreatedResponse:
-    job = service.submit_job("url", {"url": request.url})
+    job = service.submit_job("url", {"url": request.url}, callback_url=request.callback_url, callback_secret=request.callback_secret)
     return JobCreatedResponse(job_id=job.job_id, status=job.status)
 
 
@@ -78,13 +80,15 @@ def transcribe_audio_url(
 @router.post("/video", status_code=202, response_model=JobCreatedResponse)
 async def transcribe_video_upload(
     file: UploadFile = File(...),
+    callback_url: str | None = Form(None),
+    callback_secret: str | None = Form(None),
     service: TranscriptionService = Depends(get_transcription_service),
     settings: Settings = Depends(get_settings),
 ) -> JobCreatedResponse:
     _validate_extension(file.filename or "", SUPPORTED_VIDEO_EXTENSIONS)
     content = await file.read()
     saved_path = _save_upload(file, content, settings)
-    job = service.submit_job("video", {"path": str(saved_path)})
+    job = service.submit_job("video", {"path": str(saved_path)}, callback_url=callback_url, callback_secret=callback_secret)
     return JobCreatedResponse(job_id=job.job_id, status=job.status)
 
 
@@ -95,7 +99,7 @@ def transcribe_video_url(
 ) -> JobCreatedResponse:
     from transcritor.sources.youtube_source import _is_youtube_url
     source_type = "youtube" if _is_youtube_url(request.url) else "video_url"
-    job = service.submit_job(source_type, {"url": request.url})
+    job = service.submit_job(source_type, {"url": request.url}, callback_url=request.callback_url, callback_secret=request.callback_secret)
     return JobCreatedResponse(job_id=job.job_id, status=job.status)
 
 

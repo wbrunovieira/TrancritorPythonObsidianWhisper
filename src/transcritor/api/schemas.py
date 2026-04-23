@@ -7,6 +7,8 @@ from transcritor.core.models import JobStatus, TranscriptionSegment
 
 class UrlTranscriptionRequest(BaseModel):
     url: str
+    callback_url: str | None = None
+    callback_secret: str | None = None
 
 
 class JobCreatedResponse(BaseModel):

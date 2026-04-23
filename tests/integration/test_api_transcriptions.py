@@ -29,7 +29,7 @@ class FakeService:
     def preset_result(self, job_id: str, result: TranscriptionResult) -> None:
         self._results[job_id] = result
 
-    def submit_job(self, source_type: str, source_kwargs: dict) -> TranscriptionJob:
+    def submit_job(self, source_type: str, source_kwargs: dict, callback_url=None, callback_secret=None) -> TranscriptionJob:
         from uuid import uuid4
         job = TranscriptionJob(
             job_id=uuid4().hex,

@@ -29,7 +29,7 @@ docker compose up --build
 docker compose logs -f worker    # watch worker logs
 ```
 
-**System dependencies:** FFmpeg (required by moviepy and yt-dlp), Python 3.11+.
+**System dependencies:** FFmpeg (required by moviepy and yt-dlp), Node.js (required by yt-dlp's EJS JS runtime for YouTube extraction), Python 3.11+.
 
 ## Architecture
 
@@ -97,6 +97,8 @@ Swagger UI: `http://localhost:8000/docs`
 - **`compute_type="int8"`** on CPU: ~4× faster than openai-whisper with minimal quality loss.
 - **Job persistence:** status in Redis (sorted set `jobs:all` for listing); result as `.json` + `.md` on disk. Audio/video files are deleted after transcription — only the transcript is kept.
 - **TTL cleanup:** `run_cleanup(job_store, file_store, ttl_hours)` in `tasks.py` — pure function, deletes expired `done`/`failed` jobs (files + Redis). Called daily at 03:00 UTC by Celery Beat (`beat` service in docker-compose). Configured via `RESULT_TTL_HOURS` env var (default: 24).
+- **API key auth:** `verify_api_key()` dependency in `dependencies.py` checks the `X-API-Key` header against `settings.api_key`. When `api_key` is empty (default), the API is open — no auth required. All `/transcriptions/*` routes use this dependency.
+- **YouTube / bgutil:** `YouTubeSource` uses yt-dlp with a `bgutil` HTTP provider (`brainicism/bgutil-ytdlp-pot-provider`) running as a separate Docker service to bypass YouTube bot-detection (POT extraction). Configured via yt-dlp config file at `/home/appuser/.config/yt-dlp/config`. Age-restricted/private videos also require a cookies file at `settings.youtube_cookies_file` (default `/config/youtube_cookies.txt`).
 
 ## Testing Strategy
 
@@ -105,6 +107,7 @@ Swagger UI: `http://localhost:8000/docs`
 - **E2e tests** (`tests/e2e/`): full Docker stack required. Run with `-m e2e`.
 - `faster-whisper` mock: `model.transcribe()` must return `([mock_segment], mock_info)` where `mock_segment.text`, `.start`, `.end` are set and `mock_info.language`/`mock_info.duration` are set.
 - **`conftest.py` fixtures:** `reset_engine` resets the `WhisperEngine` singleton between tests; `reset_settings` clears the `get_settings()` `lru_cache`. Use these when a test mutates global state.
+- **Pytest config:** `asyncio_mode = "auto"` (all async tests run automatically). Defined markers: `slow` (requires real Whisper model), `e2e` (requires full Docker stack).
 
 ## Environment Variables
 
@@ -115,5 +118,7 @@ Swagger UI: `http://localhost:8000/docs`
 | `DATA_DIR` | `~/.transcritor` | Root for audio/, video/, transcripts/ |
 | `LOG_LEVEL` | `INFO` | Logging level |
 | `RESULT_TTL_HOURS` | `24` | Hours to keep transcript results before cleanup |
+| `API_KEY` | `""` | Secret for `X-API-Key` header; empty = open access |
+| `YOUTUBE_COOKIES_FILE` | `/config/youtube_cookies.txt` | yt-dlp cookies file for age-restricted/private YouTube videos |
 
 In Docker, `REDIS_URL` must use the service hostname: `redis://redis:6379/0`.

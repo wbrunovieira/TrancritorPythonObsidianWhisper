@@ -18,6 +18,8 @@ class TranscriptionJob(BaseModel):
     created_at: datetime
     completed_at: datetime | None = None
     error: str | None = None
+    callback_url: str | None = None
+    callback_secret: str | None = None
 
 
 class TranscriptionSegment(BaseModel):

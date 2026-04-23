@@ -28,8 +28,8 @@ def get_transcription_service(
     job_store = JobStore(redis_client)
     file_store = FileStore(settings.transcripts_dir)
 
-    def dispatch(job_id: str, source_type: str, source_kwargs: dict) -> None:
-        transcribe_task.delay(job_id, source_type, source_kwargs)
+    def dispatch(job_id: str, source_type: str, source_kwargs: dict, callback_url: str | None = None, callback_secret: str | None = None) -> None:
+        transcribe_task.delay(job_id, source_type, source_kwargs, callback_url, callback_secret)
 
     return TranscriptionService(
         file_store=file_store,

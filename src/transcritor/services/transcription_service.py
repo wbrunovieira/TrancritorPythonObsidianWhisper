@@ -13,21 +13,29 @@ class TranscriptionService:
         self,
         file_store: FileStore,
         job_store: JobStore,
-        task_dispatcher: Callable[[str, str, dict], None],
+        task_dispatcher: Callable[[str, str, dict, str | None, str | None], None],
     ):
         self._file_store = file_store
         self._job_store = job_store
         self._dispatch = task_dispatcher
 
-    def submit_job(self, source_type: str, source_kwargs: dict) -> TranscriptionJob:
+    def submit_job(
+        self,
+        source_type: str,
+        source_kwargs: dict,
+        callback_url: str | None = None,
+        callback_secret: str | None = None,
+    ) -> TranscriptionJob:
         job = TranscriptionJob(
             job_id=uuid4().hex,
             status=JobStatus.PENDING,
             source_type=source_type,
             created_at=datetime.now(),
+            callback_url=callback_url,
+            callback_secret=callback_secret,
         )
         self._job_store.save(job)
-        self._dispatch(job.job_id, source_type, source_kwargs)
+        self._dispatch(job.job_id, source_type, source_kwargs, callback_url, callback_secret)
         return job
 
     def get_job(self, job_id: str) -> TranscriptionJob:

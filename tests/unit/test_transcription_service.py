@@ -66,7 +66,7 @@ def file_store():
 
 @pytest.fixture
 def service(job_store, file_store, dispatched):
-    def fake_dispatch(job_id, source_type, source_kwargs):
+    def fake_dispatch(job_id, source_type, source_kwargs, callback_url=None, callback_secret=None):
         dispatched.append((job_id, source_type, source_kwargs))
 
     return TranscriptionService(
