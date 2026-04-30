@@ -28,6 +28,9 @@ celery_app.conf.update(
     task_track_started=True,
     task_acks_late=True,
     worker_prefetch_multiplier=1,
+    # Redis default visibility_timeout is 3600s — tasks longer than 1h get
+    # re-queued while still running. Set to 6h to cover the longest videos.
+    broker_transport_options={"visibility_timeout": 21600},
     beat_schedule={
         "cleanup-expired-results": {
             "task": "transcritor.workers.tasks.cleanup_task",
